@@ -460,6 +460,12 @@ SwitchLanguageHotkeys ParseSwitchLanguageHotkeys(const std::filesystem::path &co
         {
             result.commit_pinyin_shift_enter = ParseTomlBool(raw, true);
         }
+        else if (key == "candidate_translation_expand_key")
+        {
+            const std::string_view value = FanyImeKeyChord::TomlString(raw);
+            if (!FanyImeCandidateActionKey::Parse(value, result.candidate_translation_expand_key))
+                result.candidate_translation_expand_key = {};
+        }
         else if (key == "switch_language" && !sawShift && !sawCtrlAltSpace)
         {
             // Legacy array: switch_language = ["Ctrl+Space", "Shift"]
@@ -780,5 +786,29 @@ std::wstring GetCurrentProcessName()
 string::size_type count_utf8_chars(const string &str)
 {
     return utf8::distance(str.begin(), str.end());
+}
+
+bool IsCandidateTranslationExpandShortcut(UINT code, UINT modifiers)
+{
+    if ((GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 || (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0)
+        return false;
+    if (!ReadConfiguredCandidateTranslationsEnabled())
+        return false;
+    const SwitchLanguageHotkeys hotkeys = ReadConfiguredSwitchLanguageHotkeys();
+    const FanyImeKeyChord::Binding &binding = hotkeys.candidate_translation_expand_key;
+    if (binding.key == 0 || binding.modifiers == 0)
+        return false;
+    return binding.Matches(code, modifiers);
+}
+
+bool IsCandidateTranslationExpandBareKey(UINT code, WCHAR wch)
+{
+    if ((GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 || (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0)
+        return false;
+    if (!ReadConfiguredCandidateTranslationsEnabled())
+        return false;
+    const SwitchLanguageHotkeys hotkeys = ReadConfiguredSwitchLanguageHotkeys();
+    const FanyImeKeyChord::Binding &binding = hotkeys.candidate_translation_expand_key;
+    return binding.key == VK_OEM_3 && binding.modifiers == 0 && code == VK_OEM_3 && wch == L'`';
 }
 } // namespace FanyUtils

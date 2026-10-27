@@ -209,6 +209,11 @@ bool SetConfiguredInputStateShortcut(std::size_t index, const std::string &bindi
     return true;
 }
 
+const std::string &GetConfiguredCandidateTranslationExpandKey()
+{
+    return g_candidate_translation_expand_key;
+}
+
 const std::string &GetConfiguredShuangpinSchema()
 {
     return g_shuangpin_schema;

@@ -528,8 +528,10 @@ BOOL CMetasequoiaIME::_IsKeyEaten(         //
         // converted spelling, including compositions without candidates, unless the user turned
         // that chord off in settings -- then it must fall through to the plain Enter path.
         if (!freshCompositionState &&
-            ((_candidateMode != CANDIDATE_NONE && (IsTranslationCommitShortcut(*pCodeOut, shortcutModifiers) ||
-                                                   IsTranslationDigitShortcut(*pCodeOut, shortcutModifiers))) ||
+            ((_candidateMode != CANDIDATE_NONE &&
+              (IsTranslationCommitShortcut(*pCodeOut, shortcutModifiers) ||
+               IsTranslationDigitShortcut(*pCodeOut, shortcutModifiers) ||
+               FanyUtils::IsCandidateTranslationExpandShortcut(*pCodeOut, shortcutModifiers))) ||
              (!_serverUnavailableFallbackActive && pCompositionProcessorEngine->GetVirtualKeyLength() > 0 &&
               IsPinyinCommitShortcut(*pCodeOut, shortcutModifiers))))
         {
