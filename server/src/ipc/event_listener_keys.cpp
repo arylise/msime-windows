@@ -11,6 +11,7 @@
 #include "ipc/candidate_translation_policy.h"
 #include "ipc/input_key_policy.h"
 #include "engine/contracts/date_time_input.h"
+#include "engine/contracts/candidate_action_key.h"
 #include "engine/contracts/direct_helpcode.h"
 #include "engine/contracts/ipc_negotiation.h"
 #include "engine/contracts/mid_sentence_helpcode.h"
@@ -760,6 +761,66 @@ void HandleTranslationCommitKey(uint64_t client_id, uint64_t activation_epoch, u
     SendCurrentDataToClient(client_id, activation_epoch, request_id);
 }
 
+// 候选翻译展开键：在候选窗激活时进入/退出译文子页。裸 Backquote 与 Ctrl[+Shift]+Backquote
+// 等组合都走这里；辅助码触发优先，已在译文子页时退出优先。日期/时间子页不在第一版范围内。
+bool IsCandidateTranslationExpandKey(UINT keycode, WCHAR wch, UINT modifiers)
+{
+    FanyImeKeyChord::Binding binding;
+    if (!FanyImeCandidateActionKey::Parse(GetConfiguredCandidateTranslationExpandKey(), binding))
+        return false;
+    if (binding.key == 0)
+        return false;
+    if (binding.modifiers == 0)
+        return wch == L'`' && binding.Matches(keycode, modifiers);
+    return binding.Matches(keycode, modifiers);
+}
+
+void HandleCandidateTranslationExpandKey(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id)
+{
+    Global::MsgTypeToTsf = Global::DataFromServerMsgType::NavigationIgnored;
+    const bool japanese = g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji;
+    if (g_translation_candidates_active || g_date_time_page_active || IsUiLessMode() || japanese ||
+        !GetConfiguredCandidateTranslationsEnabled() || Global::candidate_ui.items.empty() ||
+        GlobalIme::composition.raw_input_with_cases.empty())
+    {
+        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        return;
+    }
+
+    WaitForCandidateRenderSync(Global::Keycode);
+    EnsureCandidatePageReady();
+
+    auto &ui = Global::candidate_ui;
+    const int highlighted_position = (std::max)(0, ui.selected_index_in_page);
+    const size_t index = static_cast<size_t>(highlighted_position);
+    if (index >= ui.page_glosses.size())
+    {
+        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        return;
+    }
+    const auto senses = FanyImeIpc::SplitTranslationGloss(wstring_to_string(ui.page_glosses[index]));
+    if (senses.empty())
+    {
+        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        return;
+    }
+
+    g_translation_saved_items = ui.items;
+    g_translation_saved_page_index = ui.page_index;
+    g_translation_saved_selected_index = ui.selected_index_in_page;
+    g_translation_saved_selection_started = ui.selection_started;
+    std::vector<WordItem> translation_items;
+    translation_items.reserve(senses.size());
+    for (const auto &sense : senses)
+    {
+        translation_items.emplace_back(std::string{}, sense, 0, CandidateSource::Fallback);
+    }
+    ui.set_items(std::move(translation_items));
+    g_translation_candidates_active = true;
+    RefreshCandidatePageUi(true);
+    SendCurrentDataToClient(client_id, activation_epoch, request_id);
+}
+
 // 真顶字与自动上屏的推送负载："<消费字符数>\t<上屏文本>"。TSF 拿这个数字裁自己的
 // 组合缓冲，所以服务端看到的是四码、用户已抢敲第五个字母时，第五个字母不会被旧快照覆盖。
 // 消费数就是五笔完整码的字母数（engine/schemes/wubi_scheme.h 的 kMaxCodeLength）。
@@ -1081,6 +1142,29 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         const uint32_t digit_position = FanyImeIpc::TranslationDigitPosition(Global::Keycode, Global::ModifiersDown);
         HandleTranslationCommitKey(client_id, activation_epoch, request_id, static_cast<int>(digit_position) - 1);
         return;
+    }
+    // 候选翻译展开键：在候选窗激活时进入/退出译文子页。辅助码触发优先；已在译文子页时退出优先。
+    // 日期/时间子页不在第一版展开键范围内，落到下面的通用子页退出逻辑。
+    if (IsCandidateTranslationExpandKey(Global::Keycode, Global::Wch, Global::ModifiersDown))
+    {
+        if (g_translation_candidates_active)
+        {
+            ExitCandidateSubPage();
+            Global::MsgTypeToTsf = Global::DataFromServerMsgType::NavigationIgnored;
+            SendCurrentDataToClient(client_id, activation_epoch, request_id);
+            return;
+        }
+        if (!g_date_time_page_active)
+        {
+            const std::string raw_before_key =
+                g_inputSession ? g_inputSession->get_pinyin_sequence_with_cases() : std::string{};
+            if (!IsMidSentenceHelpcodeMarkerKey(Global::Keycode, Global::Wch, raw_before_key) &&
+                !IsEndHelpcodeMarkerKey(Global::Keycode, Global::Wch, raw_before_key))
+            {
+                HandleCandidateTranslationExpandKey(client_id, activation_epoch, request_id);
+                return;
+            }
+        }
     }
     // 横排候选的左右键在这里决定是移高亮还是移光标（规则见 ShouldArrowMoveCandidateSelection）。要在下面 R 模式
     // 把光标换回引擎坐标之前判断：此刻光标和 raw_input_with_cases 都还是含 R 前缀的显示坐标，串尾的含义一致。

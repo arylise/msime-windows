@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <string>
 #include "../../../engine/contracts/input_state_shortcuts.h"
+#include "../../../engine/contracts/candidate_action_key.h"
 
 namespace FanyUtils
 {
@@ -30,6 +31,7 @@ struct SwitchLanguageHotkeys
     bool ctrl_alt_space = true;
     bool character_set_ctrl_shift_f = true;
     bool commit_pinyin_shift_enter = true;
+    FanyImeKeyChord::Binding candidate_translation_expand_key = FanyImeCandidateActionKey::DefaultBinding();
     FanyImeInputStateShortcuts::Snapshot input_state;
 };
 // Read keybindings.switch_language_* from shared config.toml.
@@ -55,4 +57,11 @@ LanguageBarVisibility ReadConfiguredLanguageBarVisibility();
 // chords, Ctrl+Enter and Ctrl+1..9, hang off it and are otherwise always on: with the glosses
 // turned off there is nothing to commit, so the chords must not be taken from the host either.
 bool ReadConfiguredCandidateTranslationsEnabled();
+
+// Whether this key is the configured candidate translation expand key.
+// IsCandidateTranslationExpandShortcut matches only modifier chords (Ctrl / Ctrl+Shift);
+// bare Backquote is handled by IsCandidateTranslationExpandBareKey so that helpcode
+// classification can run first in the synchronous and deferred paths.
+bool IsCandidateTranslationExpandShortcut(UINT code, UINT modifiers);
+bool IsCandidateTranslationExpandBareKey(UINT code, WCHAR wch);
 } // namespace FanyUtils

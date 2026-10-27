@@ -454,8 +454,10 @@ bool CMetasequoiaIME::_ClassifyDeferredKeyDown(_In_ ITfContext *pContext, WPARAM
                                           ? _deferredProjectedInputLength > 0
                                           : _pCompositionProcessorEngine->GetVirtualKeyLength() > 0;
     if (projectedImeOpen && !_IsKeyboardDisabled() &&
-        ((projectedCandidateActive && (IsTranslationCommitShortcut(*classifiedCode, capturedModifiers) ||
-                                       IsTranslationDigitShortcut(*classifiedCode, capturedModifiers))) ||
+        ((projectedCandidateActive &&
+          (IsTranslationCommitShortcut(*classifiedCode, capturedModifiers) ||
+           IsTranslationDigitShortcut(*classifiedCode, capturedModifiers) ||
+           FanyUtils::IsCandidateTranslationExpandShortcut(*classifiedCode, capturedModifiers))) ||
          (!_serverUnavailableFallbackActive && projectedInputActive &&
           IsPinyinCommitShortcut(*classifiedCode, capturedModifiers))))
     {
@@ -624,6 +626,14 @@ bool CMetasequoiaIME::_ClassifyDeferredKeyDown(_In_ ITfContext *pContext, WPARAM
             // Match the normal fresh-composition path for CapsLock with or without Shift
             isInputKey = false;
         }
+    }
+
+    // 候选翻译展开键（裸 Backquote）：与同步路径一致，在辅助码/输入键判定之后、普通候选/输入
+    // 分支之前，保证辅助码优先。只在候选窗激活、非日语模式且翻译开关开着时吃键。
+    if (shadow.candidateActive && !isInputKey && !shadow.japaneseMode &&
+        FanyUtils::IsCandidateTranslationExpandBareKey(*classifiedCode, *classifiedWch))
+    {
+        return setKeyState(CATEGORY_CANDIDATE, FUNCTION_SERVER_CANDIDATE_KEY);
     }
 
     const auto japaneseKey = ClassifyJapaneseKey(

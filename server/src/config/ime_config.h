@@ -315,6 +315,7 @@ inline FanyImeInputStateShortcuts::Values InputStateShortcutViews(const InputSta
 }
 const InputStateShortcutValues &GetConfiguredInputStateShortcuts();
 bool SetConfiguredInputStateShortcut(std::size_t index, const std::string &binding);
+const std::string &GetConfiguredCandidateTranslationExpandKey();
 const std::string &GetConfiguredShuangpinSchema();
 // 当前双拼方案是否把 ing 放在分号键上（微软、搜狗、紫光），此时分号在音节第二位是输入键。
 bool IsConfiguredShuangpinSemicolonFinal();
