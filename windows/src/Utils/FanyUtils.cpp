@@ -405,6 +405,7 @@ SwitchLanguageHotkeys ParseSwitchLanguageHotkeys(const std::filesystem::path &co
     }
 
     bool inKeybindings = false;
+    bool inGeneral = false;
     bool sawShift = false;
     bool sawCtrl = false;
     bool sawCtrlAltSpace = false;
@@ -424,9 +425,10 @@ SwitchLanguageHotkeys ParseSwitchLanguageHotkeys(const std::filesystem::path &co
         if (line.front() == '[' && line.back() == ']')
         {
             inKeybindings = (line == "[keybindings]");
+            inGeneral = (line == "[general]");
             continue;
         }
-        if (!inKeybindings)
+        if (!inKeybindings && !inGeneral)
         {
             continue;
         }
@@ -437,7 +439,11 @@ SwitchLanguageHotkeys ParseSwitchLanguageHotkeys(const std::filesystem::path &co
         }
         const std::string key = TrimAscii(line.substr(0, eq));
         const std::string raw = line.substr(eq + 1);
-        if (key == "switch_language_shift")
+        if (inGeneral && key == "candidate_translation_panel_enabled")
+        {
+            result.candidate_translation_panel_enabled = ParseTomlBool(raw, true);
+        }
+        else if (key == "switch_language_shift")
         {
             result.shift = ParseTomlBool(raw, true);
             sawShift = true;
@@ -792,11 +798,11 @@ bool IsCandidateTranslationExpandShortcut(UINT code, UINT modifiers)
 {
     if ((GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 || (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0)
         return false;
-    if (!ReadConfiguredCandidateTranslationsEnabled())
-        return false;
+    // 行内译文注释（general.candidate_translations）关掉不影响展开键：面板的译文查询在 Server 侧
+    // 与行内显示解耦。面板总开关（general.candidate_translation_panel_enabled）关掉时这颗键不吃。
     const SwitchLanguageHotkeys hotkeys = ReadConfiguredSwitchLanguageHotkeys();
     const FanyImeKeyChord::Binding &binding = hotkeys.candidate_translation_expand_key;
-    if (binding.key == 0 || binding.modifiers == 0)
+    if (!hotkeys.candidate_translation_panel_enabled || binding.key == 0 || binding.modifiers == 0)
         return false;
     return binding.Matches(code, modifiers);
 }
@@ -805,10 +811,9 @@ bool IsCandidateTranslationExpandBareKey(UINT code, WCHAR wch)
 {
     if ((GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 || (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0)
         return false;
-    if (!ReadConfiguredCandidateTranslationsEnabled())
-        return false;
     const SwitchLanguageHotkeys hotkeys = ReadConfiguredSwitchLanguageHotkeys();
     const FanyImeKeyChord::Binding &binding = hotkeys.candidate_translation_expand_key;
-    return binding.key == VK_OEM_3 && binding.modifiers == 0 && code == VK_OEM_3 && wch == L'`';
+    return hotkeys.candidate_translation_panel_enabled && binding.key == VK_OEM_3 && binding.modifiers == 0 &&
+           code == VK_OEM_3 && wch == L'`';
 }
 } // namespace FanyUtils

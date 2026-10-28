@@ -58,6 +58,7 @@ bool g_switch_language_ctrl_alt_space_enabled = true;
 bool g_character_set_shortcut_enabled = true;
 bool g_commit_pinyin_shift_enter_enabled = true;
 std::string g_candidate_translation_expand_key = "Backquote";
+std::string g_candidate_translation_move_keys = "arrows";
 InputStateShortcutValues g_input_state_shortcuts = [] {
     InputStateShortcutValues values;
     const auto defaults = FanyImeInputStateShortcuts::Defaults();
@@ -148,6 +149,16 @@ int g_floating_toolbar_auto_hide_delay = kFloatingToolbarAutoHideDelayDefault;
 bool g_floating_toolbar_shadow = true;
 bool g_english_candidates_enabled = false;
 bool g_candidate_translations_enabled = false;
+bool g_candidate_translation_panel_enabled = true;
+bool g_candidate_translation_panel_translation = true;
+bool g_candidate_translation_panel_emoji = false;
+bool g_candidate_translation_panel_kaomoji = false;
+bool g_candidate_translation_panel_symbols = false;
+int g_candidate_translation_panel_translation_max_count = kCandidateTranslationPanelMaxCountDefault;
+int g_candidate_translation_panel_emoji_max_count = kCandidateTranslationPanelMaxCountDefault;
+int g_candidate_translation_panel_kaomoji_max_count = kCandidateTranslationPanelMaxCountDefault;
+int g_candidate_translation_panel_symbols_max_count = kCandidateTranslationPanelMaxCountDefault;
+std::string g_candidate_translation_panel_position = kCandidateTranslationPanelPositionDefault;
 std::atomic_bool g_candidate_translation_show_pos{true};
 std::atomic_bool g_candidate_translation_single_sense{false};
 int g_english_mixed_input_min_chars = kEnglishMixedInputMinCharsDefault;
@@ -642,6 +653,35 @@ bool LoadImeConfig()
         }
         g_english_candidates_enabled = tbl["general"]["cn_en_mixed_input"].value_or(false);
         g_candidate_translations_enabled = tbl["general"]["candidate_translations"].value_or(false);
+        g_candidate_translation_panel_enabled = tbl["general"]["candidate_translation_panel_enabled"].value_or(true);
+        g_candidate_translation_panel_translation =
+            tbl["general"]["candidate_translation_panel_translation"].value_or(true);
+        g_candidate_translation_panel_emoji = tbl["general"]["candidate_translation_panel_emoji"].value_or(false);
+        g_candidate_translation_panel_kaomoji = tbl["general"]["candidate_translation_panel_kaomoji"].value_or(false);
+        g_candidate_translation_panel_symbols = tbl["general"]["candidate_translation_panel_symbols"].value_or(false);
+        {
+            auto read_panel_max = [&](const char *key) {
+                const int value = tbl["general"][key].value_or(kCandidateTranslationPanelMaxCountDefault);
+                return value >= kCandidateTranslationPanelMaxCountMin && value <= kCandidateTranslationPanelMaxCountMax
+                           ? value
+                           : kCandidateTranslationPanelMaxCountDefault;
+            };
+            g_candidate_translation_panel_translation_max_count =
+                read_panel_max("candidate_translation_panel_translation_max_count");
+            g_candidate_translation_panel_emoji_max_count =
+                read_panel_max("candidate_translation_panel_emoji_max_count");
+            g_candidate_translation_panel_kaomoji_max_count =
+                read_panel_max("candidate_translation_panel_kaomoji_max_count");
+            g_candidate_translation_panel_symbols_max_count =
+                read_panel_max("candidate_translation_panel_symbols_max_count");
+        }
+        {
+            const std::string position = tbl["general"]["candidate_translation_panel_position"].value_or(
+                kCandidateTranslationPanelPositionDefault);
+            g_candidate_translation_panel_position = position == kCandidateTranslationPanelPositionAdaptive
+                                                         ? kCandidateTranslationPanelPositionAdaptive
+                                                         : kCandidateTranslationPanelPositionKeepWidth;
+        }
         g_candidate_translation_show_pos.store(tbl["general"]["candidate_translation_show_pos"].value_or(true),
                                                std::memory_order_relaxed);
         g_candidate_translation_single_sense.store(tbl["general"]["candidate_translation_single_sense"].value_or(false),
@@ -783,6 +823,8 @@ bool LoadImeConfig()
             g_commit_pinyin_shift_enter_enabled = tbl["keybindings"]["commit_pinyin_shift_enter"].value_or(true);
             g_candidate_translation_expand_key =
                 tbl["keybindings"]["candidate_translation_expand_key"].value_or(std::string("Backquote"));
+            g_candidate_translation_move_keys =
+                tbl["keybindings"]["candidate_translation_move_keys"].value_or(std::string("arrows"));
             for (std::size_t i = 0; i < g_input_state_shortcuts.size(); ++i)
             {
                 const auto &definition = FanyImeInputStateShortcuts::Definitions[i];

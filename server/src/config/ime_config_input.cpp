@@ -1,5 +1,6 @@
 // 输入方案与输入行为配置：方案、中日文模式、简繁、中英切换键、双拼与五笔方案、上屏样式、辅助码、全拼纠错、模糊音和调频。
 #include "config/ime_config_internal.h"
+#include <algorithm>
 #include <cstdint>
 #include <iterator>
 #include <string>
@@ -7,6 +8,7 @@
 #include "global/globals.h"
 #include "defines/defines.h"
 #include "engine/common/helpcode_utils.h"
+#include "engine/contracts/candidate_action_key.h"
 #include "engine/contracts/direct_helpcode.h"
 #include "engine/contracts/input_state_shortcuts.h"
 #include "engine/contracts/mid_sentence_helpcode.h"
@@ -212,6 +214,41 @@ bool SetConfiguredInputStateShortcut(std::size_t index, const std::string &bindi
 const std::string &GetConfiguredCandidateTranslationExpandKey()
 {
     return g_candidate_translation_expand_key;
+}
+
+bool SetConfiguredCandidateTranslationExpandKey(const std::string &binding)
+{
+    FanyImeKeyChord::Binding parsed;
+    if (!FanyImeCandidateActionKey::Parse(binding, parsed))
+    {
+        return false;
+    }
+    if (!WriteConfiguredValue("keybindings", "candidate_translation_expand_key", EscapeTomlBasicString(binding)))
+    {
+        return false;
+    }
+    g_candidate_translation_expand_key = binding;
+    return true;
+}
+
+const std::string &GetConfiguredCandidateTranslationMoveKeys()
+{
+    return g_candidate_translation_move_keys;
+}
+
+bool SetConfiguredCandidateTranslationMoveKeys(const std::string &scheme)
+{
+    static const std::vector<std::string> allowed = {"arrows", "ctrl_arrows", "ws", "ik"};
+    if (std::find(allowed.begin(), allowed.end(), scheme) == allowed.end())
+    {
+        return false;
+    }
+    if (!WriteConfiguredValue("keybindings", "candidate_translation_move_keys", EscapeTomlBasicString(scheme)))
+    {
+        return false;
+    }
+    g_candidate_translation_move_keys = scheme;
+    return true;
 }
 
 const std::string &GetConfiguredShuangpinSchema()

@@ -286,6 +286,9 @@ std::string BuildCurrentCandidatePage()
     const bool show_autocorrect_marker = GetConfiguredQuanpinAutocorrectMarker();
     const bool show_translation_pos = GetConfiguredCandidateTranslationShowPos();
     const bool single_translation_sense = GetConfiguredCandidateTranslationSingleSense();
+    // 行内英文注释只在 candidate_translations 开时画到候选右侧。展开面板开着但行内注释关时，
+    // 译文仍要查出来填进 page_glosses（面板用），只是不画到候选行上。
+    const bool show_inline_translation = GetConfiguredCandidateTranslationsEnabled();
     // 徽标开启时才解析模型包的来源标签，每次组页解析一次，不逐候选查。标签由目录条目
     // 自己声明（万象/八股/墨奇），各家互不冒名；激活值留空时不产生整句候选，徽章分支
     // 不会被走到。
@@ -377,9 +380,12 @@ std::string BuildCurrentCandidatePage()
                 dictionary_translation = gloss->second.from_dictionary;
             }
         }
-        view.translation = FanyImeIpc::FormatTranslationGlossForDisplay(
-            raw_translation, show_translation_pos, single_translation_sense,
-            single_translation_sense && dictionary_translation);
+        if (show_inline_translation)
+        {
+            view.translation = FanyImeIpc::FormatTranslationGlossForDisplay(
+                raw_translation, show_translation_pos, single_translation_sense,
+                single_translation_sense && dictionary_translation);
+        }
         const std::string visible = view.text + view.annotation + view.badge;
         const int display_length = static_cast<int>(utf8::distance(visible.begin(), visible.end()));
         candidate_string += CandidateViewHtml(view);
@@ -409,8 +415,9 @@ std::string BuildCurrentCandidatePage()
 
 void PrepareCandidateTranslationRequest()
 {
-    const bool japanese = g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji;
-    const bool enabled = GetConfiguredCandidateTranslationsEnabled() && !IsUiLessMode() && !japanese;
+    // 行内译文注释（general.candidate_translations）关掉时主列表不显示英文，但展开面板开着且键配好了就要查译文：
+    // 竖排面板的 senses 来自 page_glosses，查询与行内显示解耦。面板总开关关掉时这条查询门控一并关掉。
+    const bool enabled = FanyNamedPipe::CandidateTranslationLookupEnabled();
     auto &ui = Global::candidate_ui;
     if (IsCandidateSubPageActive())
     {
@@ -491,6 +498,37 @@ void PublishBuiltCandidatePage(const std::wstring &candidate_string)
         for (size_t i = start; i < end; ++i)
             snapshot->expanded_words.push_back(string_to_wstring(ListedCandidateTextForOutput(ui.items[i].word)));
     }
+    // 候选展开面板：发布时按当前高亮候选跑提供方管线派生条目（当前只有翻译），面板跟随高亮
+    // （输入变化、移高亮、翻页都走这一处）。gloss 变了说明高亮换到了别的词，面板内选中位归零；
+    // 高亮到没有任何启用类别条目的词时面板这一帧不出现，状态保持打开。
+    if (ui.expansion_panel_active)
+    {
+        auto &mutable_ui = Global::candidate_ui;
+        const int highlighted = (std::max)(0, mutable_ui.selected_index_in_page);
+        // signature 记锚点词（不是 gloss）：高亮换到别的词时把面板内选中位归零。emoji-only 的候选没有
+        // gloss，只有用词才能正确触发归零。
+        const std::wstring anchor = string_to_wstring(FanyNamedPipe::CurrentExpansionAnchorWord());
+        if (anchor != mutable_ui.expansion_panel_signature)
+        {
+            mutable_ui.expansion_panel_signature = anchor;
+            mutable_ui.expansion_panel_selected = 0;
+        }
+        // 与按键路径共用同一份管线，保证面板里看到的与上屏的是同一批条目。展示按
+        // candidate_translation_show_pos 决定词性，上屏始终剥词性（在 ExpansionItem 里已分开）。
+        const auto items = FanyNamedPipe::CurrentExpansionPanelItems();
+        if (!items.empty())
+        {
+            snapshot->expansion_panel_active = true;
+            snapshot->expansion_panel_anchor = highlighted;
+            snapshot->expansion_panel_selected =
+                std::clamp(mutable_ui.expansion_panel_selected, 0, static_cast<int>(items.size()) - 1);
+            for (const auto &item : items)
+            {
+                snapshot->expansion_panel_items.push_back(
+                    {string_to_wstring(item.display), string_to_wstring(item.tag), string_to_wstring(item.commit)});
+            }
+        }
+    }
     // Stamp before publishing so the UI thread can echo back exactly which page it painted.
     snapshot->generation = ++Global::candidate_page_generation;
     Global::PublishCandidatePageSnapshot(std::move(snapshot));
@@ -522,6 +560,18 @@ void RefreshCandidatePageUi(bool show_window)
 
 namespace FanyNamedPipe
 {
+// 译文查询门控（见 internal.h 声明）。行内显示与查询解耦：这里只决定「要不要查、要不要填
+// page_glosses」，行内是否把英文画到候选右侧由 BuildCurrentCandidatePage 按 candidate_translations
+// 单独控制。展开面板的 senses 来自 page_glosses，所以面板开着就必须查，哪怕行内注释是关的。
+bool CandidateTranslationLookupEnabled()
+{
+    const bool japanese = g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji;
+    const bool panel_translation_active = GetConfiguredCandidateTranslationPanelEnabled() &&
+                                          GetConfiguredCandidateTranslationPanelTranslationEnabled() &&
+                                          !GetConfiguredCandidateTranslationExpandKey().empty();
+    return (GetConfiguredCandidateTranslationsEnabled() || panel_translation_active) && !IsUiLessMode() && !japanese;
+}
+
 std::string CurrentRankingContextKey()
 {
     if (g_inputSession)

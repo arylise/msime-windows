@@ -1317,6 +1317,15 @@ struct InputPage
     std::shared_ptr<Hideable> warningBox;
     std::unique_ptr<CredentialTest> credentialTest;
 
+    // Candidate word expansion panel (categories: translation, emoji, ...)
+    std::shared_ptr<ToggleSwitch> panelToggle;
+    std::shared_ptr<ToggleSwitch> panelTranslationToggle;
+    std::shared_ptr<ToggleSwitch> panelEmojiToggle;
+    std::shared_ptr<ToggleSwitch> panelKaomojiToggle;
+    std::shared_ptr<ToggleSwitch> panelSymbolsToggle;
+    std::shared_ptr<OpacityBox> panelOptions;
+    std::vector<std::shared_ptr<Dimmable>> panelInputs;
+
     // Models
     ModelRow lattice;
     std::shared_ptr<ToggleSwitch> latticeToggle;
@@ -1425,6 +1434,13 @@ struct InputPage
             dim->SetDisabled(!enabled);
         showPosBlock->SetDisabled(!enabled);
         singleSenseBlock->SetDisabled(!enabled);
+    }
+
+    void SetPanelEnabled(bool enabled)
+    {
+        panelOptions->SetDimmed(!enabled);
+        for (auto &dim : panelInputs)
+            dim->SetDisabled(!enabled);
     }
 
     void SyncMode(const std::string &mode)
@@ -1892,6 +1908,68 @@ VisualPtr BuildInputPage(PageContext &context)
         s->translationsToggle = master;
     }
 
+    // ---- 候选词展开面板 ----
+    {
+        auto master = Toggle(context, "general.candidate_translation_panel_enabled");
+        s->panelToggle = master;
+        auto translationCat = BindToggle(context, "general.candidate_translation_panel_translation");
+        s->panelTranslationToggle = translationCat;
+        auto emojiCat = BindToggle(context, "general.candidate_translation_panel_emoji");
+        s->panelEmojiToggle = emojiCat;
+        auto kaomojiCat = BindToggle(context, "general.candidate_translation_panel_kaomoji");
+        s->panelKaomojiToggle = kaomojiCat;
+        auto symbolsCat = BindToggle(context, "general.candidate_translation_panel_symbols");
+        s->panelSymbolsToggle = symbolsCat;
+        auto dim = [s](VisualPtr visual) -> VisualPtr {
+            auto dimmed = std::make_shared<Dimmable>(std::move(visual), 1.0f);
+            s->panelInputs.push_back(dimmed);
+            return dimmed;
+        };
+        auto options = Col(
+            {std::make_shared<Divider>(Divider::Kind::Option),
+             LanguageRow(L"翻译", L"在面板中列出高亮候选的译义，最多列到下面设的上限；关闭后面板不再显示译文",
+                         dim(translationCat)),
+             LanguageRow(L"翻译最多显示", L"「翻译」类别在面板中最多列出的条数（0–9，0 表示不限制）",
+                         dim(BindStepper(context, "general.candidate_translation_panel_translation_max_count", 0, 9))),
+             std::make_shared<Divider>(Divider::Kind::Option),
+             LanguageRow(L"表情",
+                         L"按高亮候选模糊匹配 emoji 关键词（关键词含有该词即命中），在面板中列出对应 emoji；"
+                         L"与「候选词」的 emoji 混输相互独立",
+                         dim(emojiCat)),
+             LanguageRow(L"表情最多显示", L"「表情」类别在面板中最多列出的条数（0–9，0 表示不限制）；整词命中排在前面",
+                         dim(BindStepper(context, "general.candidate_translation_panel_emoji_max_count", 0, 9))),
+             std::make_shared<Divider>(Divider::Kind::Option),
+             LanguageRow(L"颜文字",
+                         L"按高亮候选模糊匹配颜文字关键词（关键词含有该词即命中），在面板中列出对应颜文字；"
+                         L"与「候选词」的颜文字混输相互独立",
+                         dim(kaomojiCat)),
+             LanguageRow(L"颜文字最多显示",
+                         L"「颜文字」类别在面板中最多列出的条数（0–9，0 表示不限制）；整词命中排在前面",
+                         dim(BindStepper(context, "general.candidate_translation_panel_kaomoji_max_count", 0, 9))),
+             std::make_shared<Divider>(Divider::Kind::Option),
+             LanguageRow(L"符号",
+                         L"按高亮候选模糊匹配符号关键词（关键词含有该词即命中），在面板中列出对应符号；"
+                         L"与「候选词」的符号混输相互独立",
+                         dim(symbolsCat)),
+             LanguageRow(L"符号最多显示", L"「符号」类别在面板中最多列出的条数（0–9，0 表示不限制）；整词命中排在前面",
+                         dim(BindStepper(context, "general.candidate_translation_panel_symbols_max_count", 0, 9))),
+             std::make_shared<Divider>(Divider::Kind::Option),
+             LanguageRow(L"展开面板定位",
+                         L"「保持宽度」让面板与候选窗同宽，内容超出时才向右扩展；「自适应」按内容宽度展开，"
+                         L"并与当前候选列对齐，右侧放不下时贴靠屏幕右缘",
+                         dim(BindDropdown(context, "general.candidate_translation_panel_position",
+                                          Options({{"keep_width", L"保持宽度"}, {"adaptive", L"自适应"}}))))});
+        s->panelOptions = std::make_shared<OpacityBox>(options);
+        s->panelOptions->SetMargin({0.0f, 8.0f, 0.0f, 0.0f});
+        master->SetOnChanged([s, model](bool on) {
+            model->Update("general.candidate_translation_panel_enabled", on);
+            s->SetPanelEnabled(on);
+        });
+        page.AddSection(
+            Col({MakeRow(L"候选词展开面板", L"按展开键在高亮候选下方弹出面板，按已启用的类别列出内容", master),
+                 s->panelOptions}));
+    }
+
     // ---- 以词定字 ----
     {
         s->wordKeysBrackets = PaddedRadio(s->wordKeys->Add(L"[ / ]", "brackets"));
@@ -2171,6 +2249,12 @@ VisualPtr BuildInputPage(PageContext &context)
         {
             s->translationsToggle->SetChecked(translations->get<bool>());
             s->SetTranslationsEnabled(translations->get<bool>());
+        }
+        if (const Json *panel = model->Find("general.candidate_translation_panel_enabled");
+            panel && panel->is_boolean())
+        {
+            s->panelToggle->SetChecked(panel->get<bool>());
+            s->SetPanelEnabled(panel->get<bool>());
         }
         const std::string provider = model->GetString("translation.provider");
         s->provider = provider == "aliyun" || provider == "niutrans" || provider == "custom" || provider == "ai"

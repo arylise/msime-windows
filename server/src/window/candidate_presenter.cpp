@@ -151,10 +151,23 @@ struct CandidatePresenter::Impl
     std::shared_ptr<msimeui::Popup> contextMenu;
     std::shared_ptr<msimeui::Popup> contextSubmenu;
     std::shared_ptr<msimeui::MenuFlyoutItem> fixPositionItem;
+    // 候选翻译竖排面板（展开键）：挂在高亮候选下方的 Popup，内容是一个只放译义文本的竖排
+    // CandidateList。它不进场景树（root），走 Scene 的 popup 通道；每帧按发布快照重建。
+    std::shared_ptr<msimeui::Popup> translationPanel;
+    std::shared_ptr<msimeui::CandidateList> translationPanelList;
+    // 本次显示实际画出来的那一页快照；面板与列表必须来自同一页，不能各自再读一次。
+    Global::CandidatePageSnapshotPtr renderedSnapshot;
     D2D1_COLOR_F menuFill = D2D1::ColorF(0x2D2D2D);
     D2D1_COLOR_F menuBorder = ParseCssColor("#9b9b9b2e", D2D1::ColorF(0x3A3A3A, 0.18f));
     D2D1_COLOR_F menuText = D2D1::ColorF(0xE9E8E8);
     D2D1_COLOR_F menuHover = D2D1::ColorF(0x414141);
+    // 候选窗卡片自身的边框色与圆角：翻译面板要与中文候选窗统一，就复用这套，而不是右键菜单配色。
+    D2D1_COLOR_F cardFill = D2D1::ColorF(0x202020);
+    D2D1_COLOR_F cardBorder = D2D1::ColorF(0x9B9B9B, 0x2E / 255.0f);
+    float cardRadiusDip = 6.0f;
+    // 候选卡片外缘到内容的内边距（DIP）。翻译面板复用它作为 popup 内边距，让面板里高亮与边框的
+    // 间距和中文候选窗里高亮与卡片边框的间距一致。
+    msimeui::Thickness cardContentPad{5.0f, 5.0f, 5.0f, 5.0f};
     RECT hostRectBeforeMenu{};
     bool contextMenuOpen = false;
     bool contextSubmenuOpen = false;
@@ -319,6 +332,10 @@ void CandidatePresenter::ApplySkin()
     impl_->menuBorder = tokens.menuBorder;
     impl_->menuText = tokens.menuText;
     impl_->menuHover = tokens.menuHover;
+    impl_->cardFill = tokens.surface;
+    impl_->cardBorder = tokens.border;
+    impl_->cardRadiusDip = tokens.radius;
+    impl_->cardContentPad = result.cardContentPadding;
 
     msimeui::Theme theme = msimeui::ThemeManager::GetCurrent();
     theme.textInputFontFamily = string_to_wstring(GetConfiguredCandidateFont());
@@ -339,6 +356,7 @@ void CandidatePresenter::ApplySkin()
 std::uint64_t CandidatePresenter::FillItemsFromUi()
 {
     const Global::CandidatePageSnapshotPtr page = Global::LoadCandidatePageSnapshot();
+    impl_->renderedSnapshot = page;
     const bool translationsEnabled = GetConfiguredCandidateTranslationsEnabled();
     std::vector<msimeui::CandidateList::Item> items;
     items.reserve(page->page_views.size());
@@ -539,6 +557,8 @@ void CandidatePresenter::ShowItemContextMenu(size_t pageIndex, POINT clientPoint
     }
 
     CloseContextMenu(true);
+    // 右键菜单与竖排译文面板不共存：菜单要挂在被点的候选上，面板也挂在高亮候选上，两个叠着看不清。
+    CloseTranslationPanel();
     impl_->contextMenuPageIndex = pageIndex;
 
     // A mouse callback has no posted-message handoff at all, so it must not walk the worker's live page either.
@@ -776,6 +796,210 @@ void CandidatePresenter::RestoreHostAfterMenu()
     impl_->hostExpandedForMenu = false;
 }
 
+// 把当前挂着的候选翻译竖排面板从场景里摘掉。面板的关闭回调只表示「用户点了面板外面」，
+// 要通知工作线程关状态；这里逐帧重建或整窗收起，用 notify=false 的摘除，不发那个通知。
+void CandidatePresenter::CloseTranslationPanel()
+{
+    if (!impl_ || !impl_->window)
+    {
+        return;
+    }
+    if (impl_->translationPanel)
+    {
+        // 窗口缓存的 hover/focus 是指向面板里控件的裸指针，面板一销毁它们就悬空，先清掉。
+        impl_->window->DispatchImportedMessage(WM_MOUSELEAVE, 0, 0);
+        impl_->window->FocusVisual(nullptr);
+        if (msimeui::Scene *scene = impl_->window->GetScene())
+        {
+            scene->RemovePopup(impl_->translationPanel.get(), false);
+        }
+    }
+    impl_->translationPanel.reset();
+    impl_->translationPanelList.reset();
+}
+
+// 按刚画出来的那一页（renderedSnapshot）建候选展开面板：内容是高亮候选（anchor）按启用类别平铺
+// 后的全部条目（当前只有翻译），挂在它正下方。返回 true 时面板已进场景，need* 是宿主窗口要撑到的
+// 布局尺寸（DIP），PlaceAndShow 之前把 widthDip/heightDip 抬到它，面板和候选就在同一帧里画出来。
+bool CandidatePresenter::PrepareExpansionPanel(float &needWidthDip, float &needHeightDip, POINT caret, float scale)
+{
+    needWidthDip = 0.0f;
+    needHeightDip = 0.0f;
+    if (!impl_ || !impl_->window || !impl_->list || !impl_->renderedSnapshot)
+    {
+        return false;
+    }
+    const Global::CandidatePageSnapshot &page = *impl_->renderedSnapshot;
+    if (!page.expansion_panel_active || page.expansion_panel_items.empty())
+    {
+        return false;
+    }
+    const int anchorIndex = page.expansion_panel_anchor;
+    if (anchorIndex < 0 || impl_->list->GetItem(static_cast<size_t>(anchorIndex)) == nullptr)
+    {
+        return false;
+    }
+    if (!impl_->card)
+    {
+        return false;
+    }
+    // 面板与中文候选窗统一：宽度对齐候选卡片、左对齐、复用卡片边框色与圆角，两框之间留一段间距。
+    // 锚点取整张候选卡片，而不是高亮那一项。
+    const msimeui::RectF anchor = impl_->card->GetBounds();
+    if (anchor.width < 1.0f || anchor.height < 1.0f)
+    {
+        return false;
+    }
+    constexpr float kPanelGapDip = 6.0f;
+    constexpr int kMaxPanelColumns = 6;
+    constexpr float kPanelColumnGapDip = 8.0f;
+
+    // 面板锚在卡片下沿，可用空间是「卡片下沿到显示器下沿」与「卡片左边到显示器右边」。卡片顶边
+    // 在屏幕上约落在插入符处（候选窗贴着插入符），据此估算；估算偏保守只会更早转多列，不会让面板
+    // 越出屏幕（宿主本身也会被夹到显示器边界）。
+    const MonitorCoordinates monitor = GetMonitorCoordinatesFromPoint(caret);
+    const float cardBottomScreenY = static_cast<float>(caret.y) + anchor.height * scale;
+    const float availableHeightDip =
+        (static_cast<float>(monitor.bottom) - cardBottomScreenY) / scale - kPanelGapDip - 8.0f;
+    const float availableWidthDip = (static_cast<float>(monitor.right) - static_cast<float>(caret.x)) / scale - 8.0f;
+
+    // 字体、字号、配色、选中样式、数字标全部沿用主候选列表的外观（皮肤配色），这样两框看起来是一套。
+    // 面板没有辅助码、没有行内译文；每行前带与中文候选一致的 1..N 数字标（按数字直接上屏对应译义）；
+    // 强制竖排（关掉横排的网格/铺满/最小列宽）。「保持宽度」关掉 fitContent 让它铺满卡片宽度；
+    // 「自适应」打开 fitContent 让列表按最长内容测宽。
+    const bool adaptive = GetConfiguredCandidateTranslationPanelPosition() == "adaptive";
+    auto list = std::make_shared<msimeui::CandidateList>();
+    msimeui::CandidateList::Appearance appearance = impl_->list->GetAppearance();
+    appearance.fitContent = adaptive;
+    appearance.gridColumns = 0;
+    appearance.justifyHorizontalRows = false;
+    appearance.minItemWidth = 0.0f;
+    list->SetAppearance(std::move(appearance));
+    std::vector<msimeui::CandidateList::Item> items;
+    items.reserve(page.expansion_panel_items.size());
+    // 数字标与中文候选窗一致：每行前标 1..N，复用主列表的 label 外观（labelColor/字号/间距已随 appearance 复制）。
+    // 数字后面再带一段类别淡色前缀（item.tag，由提供方从类别元数据填），每个类别自带自己的标签。
+    size_t row_index = 0;
+    for (const auto &entry : page.expansion_panel_items)
+    {
+        msimeui::CandidateList::Item item;
+        item.label = std::to_wstring(row_index + 1);
+        item.tag = entry.tag;
+        item.text = entry.display;
+        items.push_back(std::move(item));
+        ++row_index;
+    }
+    list->SetItems(std::move(items));
+    list->SetSelectedIndex(static_cast<size_t>((std::max)(0, page.expansion_panel_selected)));
+
+    const msimeui::Thickness pad = impl_->cardContentPad;
+    const float innerWidth = (std::max)(1.0f, anchor.width - pad.left - pad.right);
+    // 屏幕右缘换算到窗口坐标：窗口把卡片左边 card.x 落在插入符 caret.x 上，所以窗口 x 与屏幕 x
+    // 的换算是 screenX = caret.x + (windowX - anchor.x) * scale，反解出屏幕右缘对应的窗口 x。
+    const float screenRightWindowX =
+        anchor.x + (static_cast<float>(monitor.right) - static_cast<float>(caret.x)) / scale;
+
+    // 先按单列测一次：把高度上界设成可用高度，单列放不下时返回值会被夹到可用高度，从而可靠地判定
+    // 「单列会越过下边缘」。「保持宽度」按卡片内宽测（铺满卡片）；「自适应」按可用宽度测（fitContent
+    // 让列表只占最长内容那么宽）。
+    const float singleBudgetWidth = adaptive ? (std::max)(availableWidthDip, innerWidth) : innerWidth;
+    const msimeui::SizeF single = list->MeasureInLayout({singleBudgetWidth, (std::max)(availableHeightDip, 1.0f)});
+    const float singlePanelHeight = single.height + pad.top + pad.bottom;
+    const bool multiColumn = singlePanelHeight > availableHeightDip;
+
+    float panelWidth = anchor.width;
+    float panelHeight = singlePanelHeight;
+    bool matchAnchorWidth = !adaptive;
+    if (multiColumn)
+    {
+        // 多列：把列高/列宽预算写进外观，弹窗之后以宿主视口重新测量也会得到同一布局。列高预算取
+        // 卡片下沿到显示器下沿减去间距，列宽预算取卡片左边到显示器右边；列数受 kMaxPanelColumns 与
+        // 列宽预算双重限制，放不下时末列在底部裁切。列宽预算用可用宽度（不是卡片内宽），这样测出来的是
+        // 按高度排布的自然列总宽，再据此决定面板要不要比卡片宽。
+        const float colHeight = (std::max)(availableHeightDip - kPanelGapDip, 1.0f);
+        const float colBudgetWidth = (std::max)(availableWidthDip, 1.0f);
+        msimeui::CandidateList::Appearance colAppearance = list->GetAppearance();
+        colAppearance.verticalColumns = kMaxPanelColumns;
+        colAppearance.columnGap = kPanelColumnGapDip;
+        colAppearance.columnBudgetHeight = colHeight;
+        colAppearance.columnBudgetWidth = colBudgetWidth;
+        list->SetAppearance(std::move(colAppearance));
+        const msimeui::SizeF multi = list->MeasureInLayout({colBudgetWidth, colHeight});
+        const float naturalWidth = multi.width + pad.left + pad.right;
+        panelHeight = multi.height + pad.top + pad.bottom;
+        if (adaptive)
+        {
+            // 自适应：面板宽度就是多列自然宽度，不跟卡片对齐。
+            panelWidth = naturalWidth;
+            matchAnchorWidth = false;
+        }
+        else if (naturalWidth <= anchor.width)
+        {
+            // 保持宽度：多列自然宽度没超过候选卡片就仍与候选窗同宽，列内容左对齐、右侧留白；
+            // 列布局由列宽预算（可用宽度）决定，不会被卡片内宽压回更少列。
+            panelWidth = anchor.width;
+            matchAnchorWidth = true;
+        }
+        else
+        {
+            // 保持宽度：多列自然宽度超过候选卡片时才让面板向右拓展到自然宽度。
+            panelWidth = naturalWidth;
+            matchAnchorWidth = false;
+        }
+    }
+    else if (adaptive)
+    {
+        // 自适应单列：按最长内容测宽。
+        panelWidth = single.width + pad.left + pad.right;
+        matchAnchorWidth = false;
+    }
+
+    // 面板左缘（窗口坐标）。保持宽度：与卡片左边对齐。自适应：与当前高亮候选同一列——让面板内容左缘
+    // 对齐高亮项左缘（item.x = 卡片内列表里该项的左缘），即 panelLeft = item.x - pad.left；竖排单列时
+    // 它等于卡片左边。右侧将要溢出屏幕时丢失对齐，把面板右缘贴到屏幕右缘。
+    float panelLeft = anchor.x;
+    if (adaptive)
+    {
+        const msimeui::RectF item = impl_->list->GetItemBounds(static_cast<size_t>(anchorIndex));
+        if (item.width > 0.0f)
+            panelLeft = item.x - pad.left;
+        if (panelLeft + panelWidth > screenRightWindowX)
+            panelLeft = (std::max)(0.0f, screenRightWindowX - panelWidth);
+    }
+
+    auto popup = std::make_shared<msimeui::Popup>(list);
+    // 保持宽度：单列与多列未超出时宽度跟随候选卡片，与中文候选窗对齐；超出或自适应时按测得的宽度排布。
+    // 边框与圆角复用卡片那套。内边距复用候选卡片的外缘内边距，让面板里高亮与边框的间距和中文候选窗一致。
+    popup->SetMatchAnchorWidth(matchAnchorWidth);
+    popup->SetPadding(pad);
+    popup->SetBackgroundFill(impl_->cardFill);
+    popup->SetBorderColor(impl_->cardBorder);
+    popup->SetCornerRadius(impl_->cardRadiusDip);
+    popup->SetShadowEnabled(true);
+    popup->SetPlacement(msimeui::PopupPlacement::BelowLeading);
+    popup->SetOffset(0.0f, kPanelGapDip);
+    popup->SetConstrainToViewport(true);
+    // 锚点仍取卡片下沿（y/height 用卡片），只把左缘换成 panelLeft，保证面板贴在候选窗下方。
+    popup->SetAnchorRect({panelLeft, anchor.y, anchor.width, anchor.height});
+
+    needWidthDip = (std::max)(anchor.x + anchor.width, panelLeft + panelWidth) + 8.0f;
+    needHeightDip = anchor.y + anchor.height + kPanelGapDip + panelHeight + 8.0f;
+
+    impl_->translationPanelList = std::move(list);
+    impl_->translationPanel = std::move(popup);
+    if (msimeui::Scene *scene = impl_->window->GetScene())
+    {
+        // 唯一的关闭通知：用户点了面板外面。请工作线程把面板状态关掉，下一帧就不带面板了。
+        scene->AddPopup(impl_->translationPanel, [this]() {
+            if (hwnd_)
+            {
+                PostMessageW(hwnd_, WM_CLOSE_TRANSLATION_PANEL, 0, 0);
+            }
+        });
+    }
+    return true;
+}
+
 void CandidatePresenter::PlaceAndShow(POINT caret, float widthDip, float heightDip, float cardLeftDip, float cardTopDip,
                                       const ResolvedCandidateScale &resolved)
 {
@@ -934,6 +1158,7 @@ void CandidatePresenter::ShowFromGlobalState(POINT caret)
     if (caret.y == Global::INVALID_Y)
     {
         CloseContextMenu(false);
+        CloseTranslationPanel();
         StopAnimationFrames();
         SetCandidateHostCloaked(true);
         ::is_global_wnd_cand_shown = true;
@@ -942,6 +1167,7 @@ void CandidatePresenter::ShowFromGlobalState(POINT caret)
         return;
     }
     CloseContextMenu(false);
+    CloseTranslationPanel();
     ApplySkin();
     // 减少动画的系统开关可能随时改，每次显示都重读；v1 皮肤从不播放。动画从候选窗出现时起算，
     // 同一次显示里的按键不会让它重头开始。
@@ -1061,6 +1287,15 @@ void CandidatePresenter::ShowFromGlobalState(POINT caret)
         cardLeftDip = card.x;
         cardTopDip = card.y;
     }
+    // 候选翻译竖排面板：列表刚排完、锚点已定，先把面板建好挂进场景，再把宿主撑到装得下它，
+    // PlaceAndShow 里的那一次 Present 就连面板一起画出来。卡片本身的位置和大小不受影响。
+    float panelNeedWidthDip = 0.0f;
+    float panelNeedHeightDip = 0.0f;
+    if (PrepareExpansionPanel(panelNeedWidthDip, panelNeedHeightDip, caret, scale.scale))
+    {
+        widthDip = (std::max)(widthDip, panelNeedWidthDip);
+        heightDip = (std::max)(heightDip, panelNeedHeightDip);
+    }
     PlaceAndShow(caret, widthDip, heightDip, cardLeftDip, cardTopDip, scale);
     ::is_global_wnd_cand_shown = true;
     Global::SetCandidateWindowRenderedVisible(true);
@@ -1088,6 +1323,7 @@ void CandidatePresenter::Hide()
         return;
     }
     CloseContextMenu(false);
+    CloseTranslationPanel();
     StopAnimationFrames();
     animationClockRunning_ = false;
     ::is_global_wnd_cand_shown = false;
