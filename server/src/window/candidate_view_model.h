@@ -138,6 +138,14 @@ struct CandidateFramePageState
     int page_index = 0;
     bool has_previous_page = false;
     bool has_next_page = false;
+    // 候选展开面板的内部状态也必须进签名：面板内 ↑↓ 只改 expansion_panel_selected，主列表的
+    // selected_index/page_views/caret 全不变。少了这几项，快速移动面板高亮会撞上 250ms 去抖窗口、
+    // 被判成「与屏上同一帧」而跳过重绘，于是面板高亮停在上一项、而服务端真实选中已经到下一项
+    // （空格上屏的是下一项）。item_count 让改「每类最多显示」这类改变条目数的配置也能触发重绘。
+    bool expansion_panel_active = false;
+    int expansion_panel_anchor = 0;
+    int expansion_panel_selected = 0;
+    int expansion_panel_item_count = 0;
 };
 
 inline std::wstring CandidateFrameSignature(const std::wstring &preedit, const std::vector<CandidateViewItem> &views,
@@ -162,5 +170,13 @@ inline std::wstring CandidateFrameSignature(const std::wstring &preedit, const s
     signature += pageState.has_previous_page ? L'1' : L'0';
     signature += L',';
     signature += pageState.has_next_page ? L'1' : L'0';
+    signature += L'|';
+    signature += pageState.expansion_panel_active ? L'1' : L'0';
+    signature += L',';
+    signature += std::to_wstring(pageState.expansion_panel_anchor);
+    signature += L',';
+    signature += std::to_wstring(pageState.expansion_panel_selected);
+    signature += L',';
+    signature += std::to_wstring(pageState.expansion_panel_item_count);
     return signature;
 }

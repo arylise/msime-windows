@@ -32,6 +32,9 @@ struct SwitchLanguageHotkeys
     bool character_set_ctrl_shift_f = true;
     bool commit_pinyin_shift_enter = true;
     FanyImeKeyChord::Binding candidate_translation_expand_key = FanyImeCandidateActionKey::DefaultBinding();
+    // general.candidate_translation_panel_enabled: master switch for the expand panel. When off the
+    // expand key is not eaten at all. Defaults to true, matching the shipped config template.
+    bool candidate_translation_panel_enabled = true;
     FanyImeInputStateShortcuts::Snapshot input_state;
 };
 // Read keybindings.switch_language_* from shared config.toml.

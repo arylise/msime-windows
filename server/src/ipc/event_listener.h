@@ -73,6 +73,8 @@ void EnqueueCandidateUiPaging(CandidateUiAction action, int steps);
 void EnqueueCandidateUiCommitAt(int absolute_index, std::wstring expected_text);
 // 卷轴展开面板打开或滚到底部：向会话再要一批候选，并重新发布带后续候选的候选页。
 void EnqueueCandidateUiExpand();
+// 竖排译文面板被点了外面：关掉面板状态并重新发布不带面板的一帧。
+void EnqueueCandidateUiCloseTranslationPanel();
 void EnqueuePipeSessionInvalidatedTask(uint64_t client_id, uint64_t invalidation_epoch);
 void EnqueueReloadInputSessionTask();
 void EnqueueEnsureInputSessionMatchesConfigTask();

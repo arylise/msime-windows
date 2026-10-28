@@ -90,6 +90,39 @@ TEST_CASE(candidate_frame_signature_includes_page_state)
     REQUIRE(original != CandidateFrameSignature(L"preedit", views, 10, 20, changed));
 }
 
+TEST_CASE(candidate_frame_signature_includes_expansion_panel_state)
+{
+    CandidateViewItem item;
+    item.text = "candidate";
+    const std::vector<CandidateViewItem> views{item};
+    const CandidateFramePageState page{0, 1, false, true};
+    const std::wstring original = CandidateFrameSignature(L"preedit", views, 10, 20, page);
+
+    // 面板内 ↑↓ 只改 expansion_panel_selected：必须改变签名，否则快速移动会被 250ms 去抖吞掉，
+    // 面板高亮停在上一项而服务端真实选中已到下一项（空格上屏下一项）。
+    CandidateFramePageState changed = page;
+    changed.expansion_panel_active = true;
+    changed.expansion_panel_item_count = 3;
+    const std::wstring with_panel = CandidateFrameSignature(L"preedit", views, 10, 20, changed);
+    REQUIRE(original != with_panel);
+
+    changed.expansion_panel_selected = 1;
+    REQUIRE(with_panel != CandidateFrameSignature(L"preedit", views, 10, 20, changed));
+    changed.expansion_panel_selected = 2;
+    REQUIRE(with_panel != CandidateFrameSignature(L"preedit", views, 10, 20, changed));
+
+    changed = page;
+    changed.expansion_panel_active = true;
+    changed.expansion_panel_anchor = 1;
+    changed.expansion_panel_item_count = 3;
+    REQUIRE(with_panel != CandidateFrameSignature(L"preedit", views, 10, 20, changed));
+
+    changed = page;
+    changed.expansion_panel_active = true;
+    changed.expansion_panel_item_count = 5;
+    REQUIRE(with_panel != CandidateFrameSignature(L"preedit", views, 10, 20, changed));
+}
+
 TEST_CASE(candidate_frame_signature_keeps_preedit_selection_and_caret)
 {
     CandidateViewItem first, second;

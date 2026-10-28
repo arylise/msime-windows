@@ -36,6 +36,15 @@ constexpr int kEnglishMixedInputMinCharsDefault = 2;
 constexpr int kEnglishMixedInputFirstPageCountMin = 1;
 constexpr int kEnglishMixedInputFirstPageCountMax = 3;
 constexpr int kEnglishMixedInputFirstPageCountDefault = 1;
+// 候选展开面板里每个类别（翻译 / 表情 / 颜文字 / 符号）各自最多列出的条数。范围对所有类别一致，
+// 用户可在设置页逐项调整，出厂默认 5；0 表示不限制条数。
+constexpr int kCandidateTranslationPanelMaxCountMin = 0;
+constexpr int kCandidateTranslationPanelMaxCountMax = 9;
+constexpr int kCandidateTranslationPanelMaxCountDefault = 5;
+// 候选展开面板定位模式：保持候选窗宽度，或按内容自适应并与当前候选列对齐。
+constexpr const char *kCandidateTranslationPanelPositionKeepWidth = "keep_width";
+constexpr const char *kCandidateTranslationPanelPositionAdaptive = "adaptive";
+constexpr const char *kCandidateTranslationPanelPositionDefault = kCandidateTranslationPanelPositionKeepWidth;
 
 // Config key ↔ engine rule bit. The key mirrors the enumerator name lowercased, so the
 // only mapping to review is this table; the bit position lives in the enum itself.
@@ -129,6 +138,7 @@ extern bool g_switch_language_ctrl_alt_space_enabled;
 extern bool g_character_set_shortcut_enabled;
 extern bool g_commit_pinyin_shift_enter_enabled;
 extern std::string g_candidate_translation_expand_key;
+extern std::string g_candidate_translation_move_keys;
 extern InputStateShortcutValues g_input_state_shortcuts;
 extern int g_candidate_page_size;
 extern std::string g_candidate_font;
@@ -191,6 +201,16 @@ extern int g_floating_toolbar_auto_hide_delay;
 extern bool g_floating_toolbar_shadow;
 extern bool g_english_candidates_enabled;
 extern bool g_candidate_translations_enabled;
+extern bool g_candidate_translation_panel_enabled;
+extern bool g_candidate_translation_panel_translation;
+extern bool g_candidate_translation_panel_emoji;
+extern bool g_candidate_translation_panel_kaomoji;
+extern bool g_candidate_translation_panel_symbols;
+extern int g_candidate_translation_panel_translation_max_count;
+extern int g_candidate_translation_panel_emoji_max_count;
+extern int g_candidate_translation_panel_kaomoji_max_count;
+extern int g_candidate_translation_panel_symbols_max_count;
+extern std::string g_candidate_translation_panel_position;
 extern std::atomic_bool g_candidate_translation_show_pos;
 extern std::atomic_bool g_candidate_translation_single_sense;
 extern int g_english_mixed_input_min_chars;

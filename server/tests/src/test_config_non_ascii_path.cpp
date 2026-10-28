@@ -333,6 +333,107 @@ TEST_CASE(english_first_page_count_defaults_validates_and_round_trips)
     fs::remove_all(unique_root, ec);
 }
 
+TEST_CASE(config_candidate_translation_panel_max_count_clamps_to_range)
+{
+    namespace fs = std::filesystem;
+    const fs::path unique_root = MakeProfileRoot() / L"panel-max-count";
+    const fs::path data_dir = unique_root / L"metasequoiaime";
+    const fs::path config_path = data_dir / L"config.toml";
+    std::error_code ec;
+    fs::remove_all(unique_root, ec);
+    fs::create_directories(data_dir, ec);
+    REQUIRE(!ec);
+
+    // 各类各自独立的上限：每个键都要能读、能写、越界拒绝、非数值回退默认。0 = 不限制，是合法值。
+    struct PanelMaxCountBinding
+    {
+        const char *key;
+        int (*get)();
+        bool (*set)(int);
+    };
+    const PanelMaxCountBinding bindings[] = {
+        {"candidate_translation_panel_translation_max_count", GetConfiguredCandidateTranslationPanelTranslationMaxCount,
+         SetConfiguredCandidateTranslationPanelTranslationMaxCount},
+        {"candidate_translation_panel_emoji_max_count", GetConfiguredCandidateTranslationPanelEmojiMaxCount,
+         SetConfiguredCandidateTranslationPanelEmojiMaxCount},
+        {"candidate_translation_panel_kaomoji_max_count", GetConfiguredCandidateTranslationPanelKaomojiMaxCount,
+         SetConfiguredCandidateTranslationPanelKaomojiMaxCount},
+        {"candidate_translation_panel_symbols_max_count", GetConfiguredCandidateTranslationPanelSymbolsMaxCount,
+         SetConfiguredCandidateTranslationPanelSymbolsMaxCount},
+    };
+
+    {
+        ScopedConfigLocation location(unique_root);
+        for (const auto &binding : bindings)
+        {
+            const std::string key = binding.key;
+            WriteText(config_path, "[general]\n" + key + " = 5\n");
+            InitImeConfig();
+            REQUIRE_EQ(binding.get(), 5);
+            for (const int count : {0, 1, 9, 5})
+            {
+                REQUIRE(binding.set(count));
+                REQUIRE_EQ(binding.get(), count);
+                REQUIRE_EQ(toml::parse(ReadText(config_path))["general"][key].value_or(0), count);
+                InitImeConfig();
+                REQUIRE_EQ(binding.get(), count);
+            }
+            const auto before = ReadText(config_path);
+            for (const int invalid : {-1, 10, 100})
+            {
+                REQUIRE(!binding.set(invalid));
+                REQUIRE_EQ(binding.get(), 5);
+                REQUIRE_EQ(ReadText(config_path), before);
+            }
+            // toml++ coerces a bare bool to an int, so only genuinely non-numeric junk falls back to the default.
+            for (const std::string value : {"1.5", "\"5\"", "\"true\"", "[]", "{}"})
+            {
+                WriteText(config_path, "[general]\n" + key + " = " + value + "\n");
+                InitImeConfig();
+                REQUIRE_EQ(binding.get(), 5);
+            }
+        }
+    }
+    fs::remove_all(unique_root, ec);
+}
+
+TEST_CASE(config_candidate_translation_panel_position_normalizes_to_known_values)
+{
+    namespace fs = std::filesystem;
+    const fs::path unique_root = MakeProfileRoot() / L"panel-position";
+    const fs::path data_dir = unique_root / L"metasequoiaime";
+    const fs::path config_path = data_dir / L"config.toml";
+    std::error_code ec;
+    fs::remove_all(unique_root, ec);
+    fs::create_directories(data_dir, ec);
+    REQUIRE(!ec);
+
+    {
+        ScopedConfigLocation location(unique_root);
+        // 缺省即 keep_width。
+        WriteText(config_path, "[general]\n");
+        InitImeConfig();
+        REQUIRE_EQ(GetConfiguredCandidateTranslationPanelPosition(), std::string("keep_width"));
+
+        for (const std::string &position : {"keep_width", "adaptive"})
+        {
+            REQUIRE(SetConfiguredCandidateTranslationPanelPosition(position));
+            REQUIRE_EQ(GetConfiguredCandidateTranslationPanelPosition(), position);
+            REQUIRE_EQ(toml::parse(ReadText(config_path))["general"]["candidate_translation_panel_position"].value_or(
+                           std::string{}),
+                       position);
+            InitImeConfig();
+            REQUIRE_EQ(GetConfiguredCandidateTranslationPanelPosition(), position);
+        }
+
+        // 未知值归一化为默认的 keep_width。
+        WriteText(config_path, "[general]\ncandidate_translation_panel_position = \"left\"\n");
+        InitImeConfig();
+        REQUIRE_EQ(GetConfiguredCandidateTranslationPanelPosition(), std::string("keep_width"));
+    }
+    fs::remove_all(unique_root, ec);
+}
+
 TEST_CASE(config_reload_detects_a_change_that_keeps_the_same_timestamp)
 {
     namespace fs = std::filesystem;
