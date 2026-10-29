@@ -1955,9 +1955,12 @@ VisualPtr BuildInputPage(PageContext &context)
             model->Update("general.candidate_expansion_panel_enabled", on);
             s->SetPanelEnabled(on);
         });
-        page.AddSection(
-            Col({MakeRow(L"候选词展开面板", L"按展开键在候选窗旁弹出面板，选择展开候选词输出对应内容；默认↑↓调整展开候选词，如果您使用输入法竖排模式，建议您在快捷栏页修改展开候选词的选词快捷键，否则有可能因快捷键冲突给您带来不好的体验", master),
-                 s->panelOptions}));
+        page.AddSection(Col(
+            {MakeRow(L"候选词展开面板",
+                     L"按展开键在候选窗旁弹出面板，选择展开候选词输出对应内容；默认↑↓调整展开候选词，如果您使用输入法竖"
+                     L"排模式，建议您在快捷栏页修改展开候选词的选词快捷键，否则有可能因快捷键冲突给您带来不好的体验",
+                     master),
+             s->panelOptions}));
     }
 
     // ---- 以词定字 ----
