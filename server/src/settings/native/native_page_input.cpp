@@ -1946,7 +1946,7 @@ VisualPtr BuildInputPage(PageContext &context)
              std::make_shared<Divider>(Divider::Kind::Option),
              LanguageRow(L"展开面板位置",
                          L"「下方」在选定候选词正下方弹出面板，左缘与高亮候选对齐；「右方」把面板放在候选窗右侧，"
-                         L"与候选窗保持间距、顶边跟随高亮候选移动；右侧放不下时自动回到下方",
+                         L"与候选窗保持间距、顶边跟随高亮候选移动；右侧放不下时自动回到下方；",
                          dim(BindDropdown(context, "general.candidate_expansion_panel_placement",
                                           Options({{"down", L"下方"}, {"right", L"右方"}}))))});
         s->panelOptions = std::make_shared<OpacityBox>(options);
@@ -1956,7 +1956,7 @@ VisualPtr BuildInputPage(PageContext &context)
             s->SetPanelEnabled(on);
         });
         page.AddSection(
-            Col({MakeRow(L"候选词展开面板", L"按展开键在候选窗旁弹出面板，选择展开候选词输出对应内容", master),
+            Col({MakeRow(L"候选词展开面板", L"按展开键在候选窗旁弹出面板，选择展开候选词输出对应内容；默认↑↓调整展开候选词，如果您使用输入法竖排模式，建议您在快捷栏页修改展开候选词的选词快捷键，否则有可能因快捷键冲突给您带来不好的体验", master),
                  s->panelOptions}));
     }
 
