@@ -566,9 +566,9 @@ namespace FanyNamedPipe
 bool CandidateTranslationLookupEnabled()
 {
     const bool japanese = g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji;
-    const bool panel_translation_active = GetConfiguredCandidateTranslationPanelEnabled() &&
-                                          GetConfiguredCandidateTranslationPanelTranslationEnabled() &&
-                                          !GetConfiguredCandidateTranslationExpandKey().empty();
+    const bool panel_translation_active = GetConfiguredCandidateExpansionPanelEnabled() &&
+                                          GetConfiguredCandidateExpansionPanelTranslationEnabled() &&
+                                          !GetConfiguredCandidateExpansionKey().empty();
     return (GetConfiguredCandidateTranslationsEnabled() || panel_translation_active) && !IsUiLessMode() && !japanese;
 }
 

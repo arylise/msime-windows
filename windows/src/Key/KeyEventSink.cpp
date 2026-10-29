@@ -531,7 +531,7 @@ BOOL CMetasequoiaIME::_IsKeyEaten(         //
             ((_candidateMode != CANDIDATE_NONE &&
               (IsTranslationCommitShortcut(*pCodeOut, shortcutModifiers) ||
                IsTranslationDigitShortcut(*pCodeOut, shortcutModifiers) ||
-               FanyUtils::IsCandidateTranslationExpandShortcut(*pCodeOut, shortcutModifiers))) ||
+               FanyUtils::IsCandidateExpansionShortcut(*pCodeOut, shortcutModifiers))) ||
              (!_serverUnavailableFallbackActive && pCompositionProcessorEngine->GetVirtualKeyLength() > 0 &&
               IsPinyinCommitShortcut(*pCodeOut, shortcutModifiers))))
         {

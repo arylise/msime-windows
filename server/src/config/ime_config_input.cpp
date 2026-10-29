@@ -1,4 +1,5 @@
 // 输入方案与输入行为配置：方案、中日文模式、简繁、中英切换键、双拼与五笔方案、上屏样式、辅助码、全拼纠错、模糊音和调频。
+#include "config/candidate_panel_move_key.h"
 #include "config/ime_config_internal.h"
 #include <algorithm>
 #include <cstdint>
@@ -211,43 +212,63 @@ bool SetConfiguredInputStateShortcut(std::size_t index, const std::string &bindi
     return true;
 }
 
-const std::string &GetConfiguredCandidateTranslationExpandKey()
+const std::string &GetConfiguredCandidateExpansionKey()
 {
-    return g_candidate_translation_expand_key;
+    return g_candidate_expansion_key;
 }
 
-bool SetConfiguredCandidateTranslationExpandKey(const std::string &binding)
+bool SetConfiguredCandidateExpansionKey(const std::string &binding)
 {
     FanyImeKeyChord::Binding parsed;
     if (!FanyImeCandidateActionKey::Parse(binding, parsed))
     {
         return false;
     }
-    if (!WriteConfiguredValue("keybindings", "candidate_translation_expand_key", EscapeTomlBasicString(binding)))
+    if (!WriteConfiguredValue("keybindings", "candidate_expansion_key", EscapeTomlBasicString(binding)))
     {
         return false;
     }
-    g_candidate_translation_expand_key = binding;
+    g_candidate_expansion_key = binding;
     return true;
 }
 
-const std::string &GetConfiguredCandidateTranslationMoveKeys()
+const std::string &GetConfiguredCandidateExpansionMovePrevKey()
 {
-    return g_candidate_translation_move_keys;
+    return g_candidate_expansion_move_prev_key;
 }
 
-bool SetConfiguredCandidateTranslationMoveKeys(const std::string &scheme)
+bool SetConfiguredCandidateExpansionMovePrevKey(const std::string &binding)
 {
-    static const std::vector<std::string> allowed = {"arrows", "ctrl_arrows", "ws", "ik"};
-    if (std::find(allowed.begin(), allowed.end(), scheme) == allowed.end())
+    FanyImeKeyChord::Binding parsed;
+    if (!CandidatePanelMoveKey::Parse(binding, parsed))
     {
         return false;
     }
-    if (!WriteConfiguredValue("keybindings", "candidate_translation_move_keys", EscapeTomlBasicString(scheme)))
+    if (!WriteConfiguredValue("keybindings", "candidate_expansion_move_prev_key", EscapeTomlBasicString(binding)))
     {
         return false;
     }
-    g_candidate_translation_move_keys = scheme;
+    g_candidate_expansion_move_prev_key = binding;
+    return true;
+}
+
+const std::string &GetConfiguredCandidateExpansionMoveNextKey()
+{
+    return g_candidate_expansion_move_next_key;
+}
+
+bool SetConfiguredCandidateExpansionMoveNextKey(const std::string &binding)
+{
+    FanyImeKeyChord::Binding parsed;
+    if (!CandidatePanelMoveKey::Parse(binding, parsed))
+    {
+        return false;
+    }
+    if (!WriteConfiguredValue("keybindings", "candidate_expansion_move_next_key", EscapeTomlBasicString(binding)))
+    {
+        return false;
+    }
+    g_candidate_expansion_move_next_key = binding;
     return true;
 }
 

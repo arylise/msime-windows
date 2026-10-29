@@ -26,6 +26,7 @@
 #include "global/globals.h"
 #include "window/caret_state_indicator_policy.h"
 #include "utils/ime_utils.h"
+#include "config/candidate_panel_move_key.h"
 #include "config/ime_config.h"
 #include "session/session_factory.h"
 #include "mixed/date_time_candidates.h"
@@ -772,10 +773,10 @@ void HandleTranslationCommitKey(uint64_t client_id, uint64_t activation_epoch, u
 // Ctrl[+Shift]+Backquote 等组合都走这里；辅助码触发优先，面板已开时关闭优先。
 bool IsCandidateExpansionKey(UINT keycode, WCHAR wch, UINT modifiers)
 {
-    if (!GetConfiguredCandidateTranslationPanelEnabled())
+    if (!GetConfiguredCandidateExpansionPanelEnabled())
         return false;
     FanyImeKeyChord::Binding binding;
-    if (!FanyImeCandidateActionKey::Parse(GetConfiguredCandidateTranslationExpandKey(), binding))
+    if (!FanyImeCandidateActionKey::Parse(GetConfiguredCandidateExpansionKey(), binding))
         return false;
     if (binding.key == 0)
         return false;
@@ -801,13 +802,13 @@ std::string CurrentExpansionAnchorWord()
 std::vector<std::string> CurrentExpansionCategoryOrder()
 {
     std::vector<std::string> order;
-    if (GetConfiguredCandidateTranslationPanelTranslationEnabled())
+    if (GetConfiguredCandidateExpansionPanelTranslationEnabled())
         order.push_back(std::string(FanyImeIpc::kCategoryTranslation));
-    if (GetConfiguredCandidateTranslationPanelEmojiEnabled())
+    if (GetConfiguredCandidateExpansionPanelEmojiEnabled())
         order.push_back(std::string(FanyImeIpc::kCategoryEmoji));
-    if (GetConfiguredCandidateTranslationPanelKaomojiEnabled())
+    if (GetConfiguredCandidateExpansionPanelKaomojiEnabled())
         order.push_back(std::string(FanyImeIpc::kCategoryKaomoji));
-    if (GetConfiguredCandidateTranslationPanelSymbolsEnabled())
+    if (GetConfiguredCandidateExpansionPanelSymbolsEnabled())
         order.push_back(std::string(FanyImeIpc::kCategorySymbols));
     return order;
 }
@@ -837,13 +838,13 @@ std::vector<FanyImeIpc::ExpansionItem> CurrentExpansionPanelItems()
     // 每类上限由用户在设置页各自调整（0–9，默认 5；0=不限制）。各类上限都放进上下文，由框架在
     // BuildExpansionItems 里逐类截断——翻译同样受限，「每类最多显示」是框架级能力。
     context.category_max_count[std::string(FanyImeIpc::kCategoryTranslation)] =
-        GetConfiguredCandidateTranslationPanelTranslationMaxCount();
+        GetConfiguredCandidateExpansionPanelTranslationMaxCount();
     context.category_max_count[std::string(FanyImeIpc::kCategoryEmoji)] =
-        GetConfiguredCandidateTranslationPanelEmojiMaxCount();
+        GetConfiguredCandidateExpansionPanelEmojiMaxCount();
     context.category_max_count[std::string(FanyImeIpc::kCategoryKaomoji)] =
-        GetConfiguredCandidateTranslationPanelKaomojiMaxCount();
+        GetConfiguredCandidateExpansionPanelKaomojiMaxCount();
     context.category_max_count[std::string(FanyImeIpc::kCategorySymbols)] =
-        GetConfiguredCandidateTranslationPanelSymbolsMaxCount();
+        GetConfiguredCandidateExpansionPanelSymbolsMaxCount();
     const std::vector<std::string> enabled = CurrentExpansionCategoryOrder();
     // 表情/颜文字/符号类别：按高亮词整词查 others.db，把 emoji/颜文字/符号预取进上下文（框架保持纯字节、
     // 不碰 DB）。三者都以同一个 anchor_word 为锚点，只在任一启用时取一次词。
@@ -872,9 +873,9 @@ std::vector<FanyImeIpc::ExpansionItem> CurrentExpansionPanelItems()
                 // 整词命中排在子串命中之前，截断只发生在子串尾部。
                 // 这里按各自上限取，框架还会再按同一上限截断一次（翻译也走框架截断），所以缓存即便
                 // 因改配置短暂偏大也不会多显示。
-                const int emoji_limit = PanelQueryLimitFor(GetConfiguredCandidateTranslationPanelEmojiMaxCount());
-                const int kaomoji_limit = PanelQueryLimitFor(GetConfiguredCandidateTranslationPanelKaomojiMaxCount());
-                const int symbols_limit = PanelQueryLimitFor(GetConfiguredCandidateTranslationPanelSymbolsMaxCount());
+                const int emoji_limit = PanelQueryLimitFor(GetConfiguredCandidateExpansionPanelEmojiMaxCount());
+                const int kaomoji_limit = PanelQueryLimitFor(GetConfiguredCandidateExpansionPanelKaomojiMaxCount());
+                const int symbols_limit = PanelQueryLimitFor(GetConfiguredCandidateExpansionPanelSymbolsMaxCount());
                 for (const auto &candidate :
                      metasequoia::local_modes::query_emoji_by_keyword(context.anchor_word, emoji_limit).candidates)
                 {
@@ -940,52 +941,31 @@ void MoveCandidateExpansionPanelSelection(int offset)
     ui.expansion_panel_selected = next;
 }
 
-// 面板移动键方案：arrows（↑/↓，默认）、ctrl_arrows（Ctrl+↑/↓）、ws（W/S）、ik（I/K）。
+// 面板移动键：用户在设置页录制的两枚键（默认裸 ↑ / ↓，可改 Ctrl 组合或清除）。
 // 返回 -1/1 表示移动方向，0 表示这颗键不是移动键。Alt 组合一律放行给别的分支。
 int CandidateExpansionPanelMoveOffset(UINT keycode, UINT modifiers)
 {
-    const bool ctrl = (modifiers & FanyImeKeyChord::Control) != 0;
-    const bool alt = (modifiers & FanyImeKeyChord::Alt) != 0;
-    if (alt)
+    if ((modifiers & FanyImeKeyChord::Alt) != 0)
     {
         return 0;
     }
-    const std::string &scheme = GetConfiguredCandidateTranslationMoveKeys();
-    if (scheme == "ctrl_arrows")
+    FanyImeKeyChord::Binding prev;
+    FanyImeKeyChord::Binding next;
+    CandidatePanelMoveKey::Parse(GetConfiguredCandidateExpansionMovePrevKey(), prev);
+    CandidatePanelMoveKey::Parse(GetConfiguredCandidateExpansionMoveNextKey(), next);
+    if (CandidatePanelMoveKey::Matches(prev, keycode, modifiers))
     {
-        if (!ctrl)
-        {
-            return 0;
-        }
-    }
-    else if (ctrl)
-    {
-        return 0;
-    }
-    if (scheme == "ws")
-    {
-        if (keycode == 'W')
-            return -1;
-        if (keycode == 'S')
-            return 1;
-        return 0;
-    }
-    if (scheme == "ik")
-    {
-        if (keycode == 'I')
-            return -1;
-        if (keycode == 'K')
-            return 1;
-        return 0;
-    }
-    if (keycode == VK_UP)
         return -1;
-    if (keycode == VK_DOWN)
+    }
+    if (CandidatePanelMoveKey::Matches(next, keycode, modifiers))
+    {
         return 1;
+    }
     return 0;
 }
 
-// 空格/回车：上屏面板里高亮的那条。与 Ctrl+Enter 单条译义上屏走同一条 CommitExactText 路径。
+// 空格/数字 1..9：上屏面板里高亮或对应序号的那条。与 Ctrl+Enter 单条译义上屏走同一条 CommitExactText 路径。
+// 回车不在这里：面板开着时回车先关面板再照常处理，最终上屏原始输入串（见下面的按键分发注释）。
 void CommitCandidateExpansionPanelSense(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id,
                                         int forced_index = -1)
 {
@@ -1418,10 +1398,12 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             ui.current_page_start() + ui.selected_index_in_page, ui.item_total_count);
     }
 
-    // 候选展开面板：移动键（默认 ↑↓，可在设置页换成 Ctrl+↑↓、W/S、I/K）在面板内移动条目高亮，
-    // 空格/回车上屏对应条目；数字键（1..9，与中文候选窗数字选词同序）直接上屏对应序号的条目，越界只回一帧空操作；
+    // 候选展开面板：移动键（默认裸 ↑ / ↓，可在设置页录成别的键或清除）在面板内移动条目高亮，
+    // 空格上屏对应条目；数字键（1..9，与中文候选窗数字选词同序）直接上屏对应序号的条目，越界只回一帧空操作；
+    // 回车上屏原始输入串（与面板未开时同路：服务端只回 NavigationIgnored，TSF 本地按原始输入上屏）；
     // 左右键始终移动中文候选高亮（面板跟随新高亮重新派生条目，哪怕光标不在组合串尾也不移光标），翻页键
-    // 同样让面板跟随；其它任何键先把面板关掉，再照常处理这颗键，所以退格、字母、标点在面板打开时的表现
+    // 同样让面板跟随；未被录成移动键的 ↑↓ 会照常移动候选高亮（竖排候选窗靠它们切词），面板同样跟随；
+    // 其它任何键先把面板关掉，再照常处理这颗键，所以退格、字母、标点在面板打开时的表现
     // 和没打开过它完全一致。
     if (Global::candidate_ui.expansion_panel_active && !IsCandidateSubPageActive())
     {
@@ -1435,11 +1417,13 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             SendCurrentDataToClient(client_id, activation_epoch, request_id);
             return;
         }
-        if (panel_plain_key && (Global::Keycode == VK_SPACE || Global::Keycode == VK_RETURN))
+        if (panel_plain_key && Global::Keycode == VK_SPACE)
         {
             CommitCandidateExpansionPanelSense(client_id, activation_epoch, request_id);
             return;
         }
+        // 回车不拦截：落到下面的「其它键」路径先关面板，再照常处理——普通回车上屏原始输入串，
+        // Shift+回车上屏原始/转换后的全拼，都与面板未开时完全一致。
         // 面板打开时按数字 1..9：直接上屏对应序号的条目。序号映射与中文候选窗的数字选词完全一致
         // （index = keycode - '1'；本输入法不用 0，也不走需要 Ctrl 的 TranslationDigitPosition）。越界只回
         // 一帧 OutofRange 空操作，面板保持打开，也不落到下面的普通数字选词。
@@ -1468,7 +1452,10 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             (arrow_moves_selection || Global::Keycode == VK_PRIOR || Global::Keycode == VK_NEXT ||
              Global::Keycode == VK_OEM_MINUS || Global::Keycode == VK_OEM_PLUS || Global::Keycode == VK_TAB ||
              Global::Keycode == VK_OEM_COMMA || Global::Keycode == VK_OEM_PERIOD || Global::Keycode == VK_OEM_4 ||
-             Global::Keycode == VK_OEM_6);
+             Global::Keycode == VK_OEM_6 ||
+             // ↑↓ 走到这里说明未被录成面板移动键：它们会照常移动候选高亮（竖排候选窗靠它们切词），
+             // 面板应保持打开并跟随新高亮重新派生条目、上下跟随，而不是先关再移。
+             Global::Keycode == VK_UP || Global::Keycode == VK_DOWN);
         if (!panel_follows_highlight)
         {
             CloseCandidateExpansionPanel();

@@ -92,144 +92,143 @@ bool SetConfiguredCandidateTranslationsEnabled(bool enabled)
     return true;
 }
 
-bool GetConfiguredCandidateTranslationPanelEnabled()
+bool GetConfiguredCandidateExpansionPanelEnabled()
 {
-    return g_candidate_translation_panel_enabled;
+    return g_candidate_expansion_panel_enabled;
 }
 
-bool SetConfiguredCandidateTranslationPanelEnabled(bool enabled)
+bool SetConfiguredCandidateExpansionPanelEnabled(bool enabled)
 {
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_enabled", enabled ? "true" : "false"))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_enabled", enabled ? "true" : "false"))
         return false;
-    g_candidate_translation_panel_enabled = enabled;
+    g_candidate_expansion_panel_enabled = enabled;
     return true;
 }
 
-bool GetConfiguredCandidateTranslationPanelTranslationEnabled()
+bool GetConfiguredCandidateExpansionPanelTranslationEnabled()
 {
-    return g_candidate_translation_panel_translation;
+    return g_candidate_expansion_panel_translation;
 }
 
-bool SetConfiguredCandidateTranslationPanelTranslationEnabled(bool enabled)
+bool SetConfiguredCandidateExpansionPanelTranslationEnabled(bool enabled)
 {
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_translation", enabled ? "true" : "false"))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_translation", enabled ? "true" : "false"))
         return false;
-    g_candidate_translation_panel_translation = enabled;
+    g_candidate_expansion_panel_translation = enabled;
     return true;
 }
 
-bool GetConfiguredCandidateTranslationPanelEmojiEnabled()
+bool GetConfiguredCandidateExpansionPanelEmojiEnabled()
 {
-    return g_candidate_translation_panel_emoji;
+    return g_candidate_expansion_panel_emoji;
 }
 
-bool SetConfiguredCandidateTranslationPanelEmojiEnabled(bool enabled)
+bool SetConfiguredCandidateExpansionPanelEmojiEnabled(bool enabled)
 {
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_emoji", enabled ? "true" : "false"))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_emoji", enabled ? "true" : "false"))
         return false;
-    g_candidate_translation_panel_emoji = enabled;
+    g_candidate_expansion_panel_emoji = enabled;
     return true;
 }
 
-bool GetConfiguredCandidateTranslationPanelKaomojiEnabled()
+bool GetConfiguredCandidateExpansionPanelKaomojiEnabled()
 {
-    return g_candidate_translation_panel_kaomoji;
+    return g_candidate_expansion_panel_kaomoji;
 }
 
-bool SetConfiguredCandidateTranslationPanelKaomojiEnabled(bool enabled)
+bool SetConfiguredCandidateExpansionPanelKaomojiEnabled(bool enabled)
 {
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_kaomoji", enabled ? "true" : "false"))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_kaomoji", enabled ? "true" : "false"))
         return false;
-    g_candidate_translation_panel_kaomoji = enabled;
+    g_candidate_expansion_panel_kaomoji = enabled;
     return true;
 }
 
-bool GetConfiguredCandidateTranslationPanelSymbolsEnabled()
+bool GetConfiguredCandidateExpansionPanelSymbolsEnabled()
 {
-    return g_candidate_translation_panel_symbols;
+    return g_candidate_expansion_panel_symbols;
 }
 
-bool SetConfiguredCandidateTranslationPanelSymbolsEnabled(bool enabled)
+bool SetConfiguredCandidateExpansionPanelSymbolsEnabled(bool enabled)
 {
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_symbols", enabled ? "true" : "false"))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_symbols", enabled ? "true" : "false"))
         return false;
-    g_candidate_translation_panel_symbols = enabled;
+    g_candidate_expansion_panel_symbols = enabled;
     return true;
 }
 
-int GetConfiguredCandidateTranslationPanelTranslationMaxCount()
+int GetConfiguredCandidateExpansionPanelTranslationMaxCount()
 {
-    return g_candidate_translation_panel_translation_max_count;
+    return g_candidate_expansion_panel_translation_max_count;
 }
 
-bool SetConfiguredCandidateTranslationPanelTranslationMaxCount(int count)
+bool SetConfiguredCandidateExpansionPanelTranslationMaxCount(int count)
 {
-    if (count < kCandidateTranslationPanelMaxCountMin || count > kCandidateTranslationPanelMaxCountMax)
+    if (count < kCandidateExpansionPanelMaxCountMin || count > kCandidateExpansionPanelMaxCountMax)
         return false;
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_translation_max_count", std::to_string(count)))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_translation_max_count", std::to_string(count)))
         return false;
-    g_candidate_translation_panel_translation_max_count = count;
+    g_candidate_expansion_panel_translation_max_count = count;
     return true;
 }
 
-int GetConfiguredCandidateTranslationPanelEmojiMaxCount()
+int GetConfiguredCandidateExpansionPanelEmojiMaxCount()
 {
-    return g_candidate_translation_panel_emoji_max_count;
+    return g_candidate_expansion_panel_emoji_max_count;
 }
 
-bool SetConfiguredCandidateTranslationPanelEmojiMaxCount(int count)
+bool SetConfiguredCandidateExpansionPanelEmojiMaxCount(int count)
 {
-    if (count < kCandidateTranslationPanelMaxCountMin || count > kCandidateTranslationPanelMaxCountMax)
+    if (count < kCandidateExpansionPanelMaxCountMin || count > kCandidateExpansionPanelMaxCountMax)
         return false;
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_emoji_max_count", std::to_string(count)))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_emoji_max_count", std::to_string(count)))
         return false;
-    g_candidate_translation_panel_emoji_max_count = count;
+    g_candidate_expansion_panel_emoji_max_count = count;
     return true;
 }
 
-int GetConfiguredCandidateTranslationPanelKaomojiMaxCount()
+int GetConfiguredCandidateExpansionPanelKaomojiMaxCount()
 {
-    return g_candidate_translation_panel_kaomoji_max_count;
+    return g_candidate_expansion_panel_kaomoji_max_count;
 }
 
-bool SetConfiguredCandidateTranslationPanelKaomojiMaxCount(int count)
+bool SetConfiguredCandidateExpansionPanelKaomojiMaxCount(int count)
 {
-    if (count < kCandidateTranslationPanelMaxCountMin || count > kCandidateTranslationPanelMaxCountMax)
+    if (count < kCandidateExpansionPanelMaxCountMin || count > kCandidateExpansionPanelMaxCountMax)
         return false;
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_kaomoji_max_count", std::to_string(count)))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_kaomoji_max_count", std::to_string(count)))
         return false;
-    g_candidate_translation_panel_kaomoji_max_count = count;
+    g_candidate_expansion_panel_kaomoji_max_count = count;
     return true;
 }
 
-int GetConfiguredCandidateTranslationPanelSymbolsMaxCount()
+int GetConfiguredCandidateExpansionPanelSymbolsMaxCount()
 {
-    return g_candidate_translation_panel_symbols_max_count;
+    return g_candidate_expansion_panel_symbols_max_count;
 }
 
-bool SetConfiguredCandidateTranslationPanelSymbolsMaxCount(int count)
+bool SetConfiguredCandidateExpansionPanelSymbolsMaxCount(int count)
 {
-    if (count < kCandidateTranslationPanelMaxCountMin || count > kCandidateTranslationPanelMaxCountMax)
+    if (count < kCandidateExpansionPanelMaxCountMin || count > kCandidateExpansionPanelMaxCountMax)
         return false;
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_symbols_max_count", std::to_string(count)))
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_symbols_max_count", std::to_string(count)))
         return false;
-    g_candidate_translation_panel_symbols_max_count = count;
+    g_candidate_expansion_panel_symbols_max_count = count;
     return true;
 }
 
-const std::string &GetConfiguredCandidateTranslationPanelPosition()
+const std::string &GetConfiguredCandidateExpansionPanelPlacement()
 {
-    return g_candidate_translation_panel_position;
+    return g_candidate_expansion_panel_placement;
 }
 
-bool SetConfiguredCandidateTranslationPanelPosition(const std::string &position)
+bool SetConfiguredCandidateExpansionPanelPlacement(const std::string &placement)
 {
-    const std::string normalized = position == kCandidateTranslationPanelPositionAdaptive
-                                       ? kCandidateTranslationPanelPositionAdaptive
-                                       : kCandidateTranslationPanelPositionKeepWidth;
-    if (!WriteConfiguredValue("general", "candidate_translation_panel_position", EscapeTomlBasicString(normalized)))
+    if (placement != kCandidateExpansionPanelPlacementDown && placement != kCandidateExpansionPanelPlacementRight)
         return false;
-    g_candidate_translation_panel_position = normalized;
+    if (!WriteConfiguredValue("general", "candidate_expansion_panel_placement", EscapeTomlBasicString(placement)))
+        return false;
+    g_candidate_expansion_panel_placement = placement;
     return true;
 }
 

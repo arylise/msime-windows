@@ -333,7 +333,7 @@ TEST_CASE(english_first_page_count_defaults_validates_and_round_trips)
     fs::remove_all(unique_root, ec);
 }
 
-TEST_CASE(config_candidate_translation_panel_max_count_clamps_to_range)
+TEST_CASE(config_candidate_expansion_panel_max_count_clamps_to_range)
 {
     namespace fs = std::filesystem;
     const fs::path unique_root = MakeProfileRoot() / L"panel-max-count";
@@ -352,14 +352,14 @@ TEST_CASE(config_candidate_translation_panel_max_count_clamps_to_range)
         bool (*set)(int);
     };
     const PanelMaxCountBinding bindings[] = {
-        {"candidate_translation_panel_translation_max_count", GetConfiguredCandidateTranslationPanelTranslationMaxCount,
-         SetConfiguredCandidateTranslationPanelTranslationMaxCount},
-        {"candidate_translation_panel_emoji_max_count", GetConfiguredCandidateTranslationPanelEmojiMaxCount,
-         SetConfiguredCandidateTranslationPanelEmojiMaxCount},
-        {"candidate_translation_panel_kaomoji_max_count", GetConfiguredCandidateTranslationPanelKaomojiMaxCount,
-         SetConfiguredCandidateTranslationPanelKaomojiMaxCount},
-        {"candidate_translation_panel_symbols_max_count", GetConfiguredCandidateTranslationPanelSymbolsMaxCount,
-         SetConfiguredCandidateTranslationPanelSymbolsMaxCount},
+        {"candidate_expansion_panel_translation_max_count", GetConfiguredCandidateExpansionPanelTranslationMaxCount,
+         SetConfiguredCandidateExpansionPanelTranslationMaxCount},
+        {"candidate_expansion_panel_emoji_max_count", GetConfiguredCandidateExpansionPanelEmojiMaxCount,
+         SetConfiguredCandidateExpansionPanelEmojiMaxCount},
+        {"candidate_expansion_panel_kaomoji_max_count", GetConfiguredCandidateExpansionPanelKaomojiMaxCount,
+         SetConfiguredCandidateExpansionPanelKaomojiMaxCount},
+        {"candidate_expansion_panel_symbols_max_count", GetConfiguredCandidateExpansionPanelSymbolsMaxCount,
+         SetConfiguredCandidateExpansionPanelSymbolsMaxCount},
     };
 
     {
@@ -397,10 +397,10 @@ TEST_CASE(config_candidate_translation_panel_max_count_clamps_to_range)
     fs::remove_all(unique_root, ec);
 }
 
-TEST_CASE(config_candidate_translation_panel_position_normalizes_to_known_values)
+TEST_CASE(config_candidate_expansion_panel_placement_normalizes_to_known_values)
 {
     namespace fs = std::filesystem;
-    const fs::path unique_root = MakeProfileRoot() / L"panel-position";
+    const fs::path unique_root = MakeProfileRoot() / L"panel-placement";
     const fs::path data_dir = unique_root / L"metasequoiaime";
     const fs::path config_path = data_dir / L"config.toml";
     std::error_code ec;
@@ -410,26 +410,82 @@ TEST_CASE(config_candidate_translation_panel_position_normalizes_to_known_values
 
     {
         ScopedConfigLocation location(unique_root);
-        // 缺省即 keep_width。
+        // 缺省即 down。
         WriteText(config_path, "[general]\n");
         InitImeConfig();
-        REQUIRE_EQ(GetConfiguredCandidateTranslationPanelPosition(), std::string("keep_width"));
+        REQUIRE_EQ(GetConfiguredCandidateExpansionPanelPlacement(), std::string("down"));
 
-        for (const std::string &position : {"keep_width", "adaptive"})
+        for (const std::string &placement : {"down", "right"})
         {
-            REQUIRE(SetConfiguredCandidateTranslationPanelPosition(position));
-            REQUIRE_EQ(GetConfiguredCandidateTranslationPanelPosition(), position);
-            REQUIRE_EQ(toml::parse(ReadText(config_path))["general"]["candidate_translation_panel_position"].value_or(
+            REQUIRE(SetConfiguredCandidateExpansionPanelPlacement(placement));
+            REQUIRE_EQ(GetConfiguredCandidateExpansionPanelPlacement(), placement);
+            REQUIRE_EQ(toml::parse(ReadText(config_path))["general"]["candidate_expansion_panel_placement"].value_or(
                            std::string{}),
-                       position);
+                       placement);
             InitImeConfig();
-            REQUIRE_EQ(GetConfiguredCandidateTranslationPanelPosition(), position);
+            REQUIRE_EQ(GetConfiguredCandidateExpansionPanelPlacement(), placement);
         }
 
-        // 未知值归一化为默认的 keep_width。
-        WriteText(config_path, "[general]\ncandidate_translation_panel_position = \"left\"\n");
+        // setter 拒绝未知值（含已放弃的 left 与已删除的旧 position 值）；加载时未知值归一化为默认 down。
+        const auto before = ReadText(config_path);
+        for (const std::string &invalid : {"up", "middle", "left", "keep_width", "adaptive", ""})
+        {
+            REQUIRE(!SetConfiguredCandidateExpansionPanelPlacement(invalid));
+            REQUIRE_EQ(ReadText(config_path), before);
+        }
+        WriteText(config_path, "[general]\ncandidate_expansion_panel_placement = \"opposite\"\n");
         InitImeConfig();
-        REQUIRE_EQ(GetConfiguredCandidateTranslationPanelPosition(), std::string("keep_width"));
+        REQUIRE_EQ(GetConfiguredCandidateExpansionPanelPlacement(), std::string("down"));
+    }
+    fs::remove_all(unique_root, ec);
+}
+
+TEST_CASE(candidate_panel_move_prev_next_keys_default_and_round_trip)
+{
+    namespace fs = std::filesystem;
+    const fs::path unique_root = MakeProfileRoot() / L"panel-move-keys";
+    const fs::path data_dir = unique_root / L"metasequoiaime";
+    const fs::path config_path = data_dir / L"config.toml";
+    std::error_code ec;
+    fs::remove_all(unique_root, ec);
+    fs::create_directories(data_dir, ec);
+    REQUIRE(!ec);
+
+    {
+        ScopedConfigLocation location(unique_root);
+        // 缺省即裸 ↑ / ↓。
+        WriteText(config_path, "[general]\n");
+        InitImeConfig();
+        REQUIRE_EQ(GetConfiguredCandidateExpansionMovePrevKey(), std::string("Up"));
+        REQUIRE_EQ(GetConfiguredCandidateExpansionMoveNextKey(), std::string("Down"));
+
+        // 录制值能读、能写、能重载；空串 = 未绑定，是合法值。
+        for (const std::string value : {"Ctrl+Up", "KeyW", "F5", "Space", ""})
+        {
+            REQUIRE(SetConfiguredCandidateExpansionMovePrevKey(value));
+            REQUIRE_EQ(GetConfiguredCandidateExpansionMovePrevKey(), value);
+            REQUIRE_EQ(toml::parse(ReadText(config_path))["keybindings"]["candidate_expansion_move_prev_key"].value_or(
+                           std::string{"?"}),
+                       value);
+            InitImeConfig();
+            REQUIRE_EQ(GetConfiguredCandidateExpansionMovePrevKey(), value);
+        }
+        REQUIRE(SetConfiguredCandidateExpansionMoveNextKey("Ctrl+Down"));
+        REQUIRE_EQ(GetConfiguredCandidateExpansionMoveNextKey(), std::string("Ctrl+Down"));
+
+        // 非法绑定：setter 拒绝且不写文件；加载时非法值回落到默认。
+        const auto before = ReadText(config_path);
+        for (const std::string value : {"Alt+Up", "Ctrl+", "Shift+Up", "NotAKey"})
+        {
+            REQUIRE(!SetConfiguredCandidateExpansionMovePrevKey(value));
+            REQUIRE_EQ(GetConfiguredCandidateExpansionMovePrevKey(), std::string(""));
+            REQUIRE_EQ(ReadText(config_path), before);
+        }
+        WriteText(config_path, "[keybindings]\ncandidate_expansion_move_prev_key = \"Alt+Up\"\n"
+                               "candidate_expansion_move_next_key = \"NotAKey\"\n");
+        InitImeConfig();
+        REQUIRE_EQ(GetConfiguredCandidateExpansionMovePrevKey(), std::string("Up"));
+        REQUIRE_EQ(GetConfiguredCandidateExpansionMoveNextKey(), std::string("Down"));
     }
     fs::remove_all(unique_root, ec);
 }
