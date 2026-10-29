@@ -402,17 +402,17 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"floating_toolbar_shadow", GetConfiguredFloatingToolbarShadow()},
             {"cn_en_mixed_input", GetConfiguredEnglishCandidatesEnabled()},
             {"candidate_translations", GetConfiguredCandidateTranslationsEnabled()},
-            {"candidate_translation_panel_enabled", GetConfiguredCandidateTranslationPanelEnabled()},
-            {"candidate_translation_panel_translation", GetConfiguredCandidateTranslationPanelTranslationEnabled()},
-            {"candidate_translation_panel_emoji", GetConfiguredCandidateTranslationPanelEmojiEnabled()},
-            {"candidate_translation_panel_kaomoji", GetConfiguredCandidateTranslationPanelKaomojiEnabled()},
-            {"candidate_translation_panel_symbols", GetConfiguredCandidateTranslationPanelSymbolsEnabled()},
-            {"candidate_translation_panel_translation_max_count",
-             GetConfiguredCandidateTranslationPanelTranslationMaxCount()},
-            {"candidate_translation_panel_emoji_max_count", GetConfiguredCandidateTranslationPanelEmojiMaxCount()},
-            {"candidate_translation_panel_kaomoji_max_count", GetConfiguredCandidateTranslationPanelKaomojiMaxCount()},
-            {"candidate_translation_panel_symbols_max_count", GetConfiguredCandidateTranslationPanelSymbolsMaxCount()},
-            {"candidate_translation_panel_position", GetConfiguredCandidateTranslationPanelPosition()},
+            {"candidate_expansion_panel_enabled", GetConfiguredCandidateExpansionPanelEnabled()},
+            {"candidate_expansion_panel_translation", GetConfiguredCandidateExpansionPanelTranslationEnabled()},
+            {"candidate_expansion_panel_emoji", GetConfiguredCandidateExpansionPanelEmojiEnabled()},
+            {"candidate_expansion_panel_kaomoji", GetConfiguredCandidateExpansionPanelKaomojiEnabled()},
+            {"candidate_expansion_panel_symbols", GetConfiguredCandidateExpansionPanelSymbolsEnabled()},
+            {"candidate_expansion_panel_translation_max_count",
+             GetConfiguredCandidateExpansionPanelTranslationMaxCount()},
+            {"candidate_expansion_panel_emoji_max_count", GetConfiguredCandidateExpansionPanelEmojiMaxCount()},
+            {"candidate_expansion_panel_kaomoji_max_count", GetConfiguredCandidateExpansionPanelKaomojiMaxCount()},
+            {"candidate_expansion_panel_symbols_max_count", GetConfiguredCandidateExpansionPanelSymbolsMaxCount()},
+            {"candidate_expansion_panel_placement", GetConfiguredCandidateExpansionPanelPlacement()},
             {"candidate_translation_show_pos", GetConfiguredCandidateTranslationShowPos()},
             {"candidate_translation_single_sense", GetConfiguredCandidateTranslationSingleSense()},
             {"cn_en_mixed_input_min_chars", GetConfiguredEnglishMixedInputMinChars()},
@@ -481,8 +481,9 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"switch_language_ctrl_alt_space", GetConfiguredSwitchLanguageCtrlAltSpaceEnabled()},
             {"toggle_character_set_ctrl_shift_f", GetConfiguredCharacterSetShortcutEnabled()},
              {"commit_pinyin_shift_enter", GetConfiguredPinyinCommitShortcutEnabled()},
-             {"candidate_translation_expand_key", GetConfiguredCandidateTranslationExpandKey()},
-             {"candidate_translation_move_keys", GetConfiguredCandidateTranslationMoveKeys()},
+             {"candidate_expansion_key", GetConfiguredCandidateExpansionKey()},
+              {"candidate_expansion_move_prev_key", GetConfiguredCandidateExpansionMovePrevKey()},
+              {"candidate_expansion_move_next_key", GetConfiguredCandidateExpansionMoveNextKey()},
              {"input_state_shortcuts", BuildInputStateShortcutMetadata()},
             {"trilingual_cycle", GetConfiguredTrilingualCycleEnabled()}}},
           {"frequency_adjustment",
@@ -860,26 +861,27 @@ bool ApplyConfigUpdate(const json::object &data)
         return SetConfiguredEnglishCandidatesEnabled(json::value_to<bool>(data.at("value")));
     if (path == "general.candidate_translations")
         return SetConfiguredCandidateTranslationsEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.candidate_translation_panel_enabled")
-        return SetConfiguredCandidateTranslationPanelEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.candidate_translation_panel_translation")
-        return SetConfiguredCandidateTranslationPanelTranslationEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.candidate_translation_panel_emoji")
-        return SetConfiguredCandidateTranslationPanelEmojiEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.candidate_translation_panel_kaomoji")
-        return SetConfiguredCandidateTranslationPanelKaomojiEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.candidate_translation_panel_symbols")
-        return SetConfiguredCandidateTranslationPanelSymbolsEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.candidate_translation_panel_translation_max_count")
-        return SetConfiguredCandidateTranslationPanelTranslationMaxCount(static_cast<int>(data.at("value").as_int64()));
-    if (path == "general.candidate_translation_panel_emoji_max_count")
-        return SetConfiguredCandidateTranslationPanelEmojiMaxCount(static_cast<int>(data.at("value").as_int64()));
-    if (path == "general.candidate_translation_panel_kaomoji_max_count")
-        return SetConfiguredCandidateTranslationPanelKaomojiMaxCount(static_cast<int>(data.at("value").as_int64()));
-    if (path == "general.candidate_translation_panel_symbols_max_count")
-        return SetConfiguredCandidateTranslationPanelSymbolsMaxCount(static_cast<int>(data.at("value").as_int64()));
-    if (path == "general.candidate_translation_panel_position")
-        return SetConfiguredCandidateTranslationPanelPosition(json::value_to<std::string>(data.at("value")));
+    if (path == "general.candidate_expansion_panel_enabled")
+        return SetConfiguredCandidateExpansionPanelEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.candidate_expansion_panel_translation")
+        return SetConfiguredCandidateExpansionPanelTranslationEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.candidate_expansion_panel_emoji")
+        return SetConfiguredCandidateExpansionPanelEmojiEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.candidate_expansion_panel_kaomoji")
+        return SetConfiguredCandidateExpansionPanelKaomojiEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.candidate_expansion_panel_symbols")
+        return SetConfiguredCandidateExpansionPanelSymbolsEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.candidate_expansion_panel_translation_max_count")
+        return SetConfiguredCandidateExpansionPanelTranslationMaxCount(static_cast<int>(data.at("value").as_int64()));
+    if (path == "general.candidate_expansion_panel_emoji_max_count")
+        return SetConfiguredCandidateExpansionPanelEmojiMaxCount(static_cast<int>(data.at("value").as_int64()));
+    if (path == "general.candidate_expansion_panel_kaomoji_max_count")
+        return SetConfiguredCandidateExpansionPanelKaomojiMaxCount(static_cast<int>(data.at("value").as_int64()));
+    if (path == "general.candidate_expansion_panel_symbols_max_count")
+        return SetConfiguredCandidateExpansionPanelSymbolsMaxCount(static_cast<int>(data.at("value").as_int64()));
+    if (path == "general.candidate_expansion_panel_placement")
+        return data.at("value").is_string() &&
+               SetConfiguredCandidateExpansionPanelPlacement(json::value_to<std::string>(data.at("value")));
     if (path == "general.candidate_translation_show_pos")
         return SetConfiguredCandidateTranslationShowPos(json::value_to<bool>(data.at("value")));
     if (path == "general.candidate_translation_single_sense")
@@ -978,12 +980,15 @@ bool ApplyConfigUpdate(const json::object &data)
         return SetConfiguredCharacterSetShortcutEnabled(json::value_to<bool>(data.at("value")));
     if (path == "keybindings.commit_pinyin_shift_enter")
         return SetConfiguredPinyinCommitShortcutEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "keybindings.candidate_translation_expand_key")
+    if (path == "keybindings.candidate_expansion_key")
         return data.at("value").is_string() &&
-               SetConfiguredCandidateTranslationExpandKey(json::value_to<std::string>(data.at("value")));
-    if (path == "keybindings.candidate_translation_move_keys")
+               SetConfiguredCandidateExpansionKey(json::value_to<std::string>(data.at("value")));
+    if (path == "keybindings.candidate_expansion_move_prev_key")
         return data.at("value").is_string() &&
-               SetConfiguredCandidateTranslationMoveKeys(json::value_to<std::string>(data.at("value")));
+               SetConfiguredCandidateExpansionMovePrevKey(json::value_to<std::string>(data.at("value")));
+    if (path == "keybindings.candidate_expansion_move_next_key")
+        return data.at("value").is_string() &&
+               SetConfiguredCandidateExpansionMoveNextKey(json::value_to<std::string>(data.at("value")));
     if (path == "keybindings.trilingual_cycle")
         return SetConfiguredTrilingualCycleEnabled(json::value_to<bool>(data.at("value")));
     if (const std::size_t index = InputStateShortcutIndex(path); index < FanyImeInputStateShortcuts::Definitions.size())

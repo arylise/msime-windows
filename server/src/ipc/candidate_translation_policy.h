@@ -180,6 +180,7 @@ inline std::vector<std::string> SplitTranslationGloss(std::string_view gloss, bo
 {
     static constexpr std::string_view kFullwidthSemicolon = "\xEF\xBC\x9B";
     std::vector<std::string> senses;
+    size_t start = 0;
     const auto push = [&senses, strip_pos](std::string_view sense) {
         const size_t first = sense.find_first_not_of(" \t\r\n");
         if (first == std::string_view::npos)
@@ -190,7 +191,6 @@ inline std::vector<std::string> SplitTranslationGloss(std::string_view gloss, bo
             trimmed = StripPartOfSpeechLabel(trimmed);
         senses.emplace_back(trimmed);
     };
-    size_t start = 0;
     while (start <= gloss.size())
     {
         const size_t ascii = gloss.find(';', start);

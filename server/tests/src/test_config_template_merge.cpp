@@ -86,7 +86,7 @@ TEST_CASE(commit_pinyin_shortcut_upgrade_adds_default_and_preserves_choice)
     REQUIRE(merged["keybindings"]["switch_language_shift"].value_or(false));
 }
 
-TEST_CASE(candidate_translation_expand_key_upgrade_adds_default_and_preserves_choice)
+TEST_CASE(candidate_expansion_key_upgrade_adds_default_and_preserves_choice)
 {
     std::ifstream input(MSIME_DEFAULT_CONFIG_PATH, std::ios::binary);
     REQUIRE(static_cast<bool>(input));
@@ -97,18 +97,16 @@ TEST_CASE(candidate_translation_expand_key_upgrade_adds_default_and_preserves_ch
     std::ifstream development(working_path, std::ios::binary);
     REQUIRE(static_cast<bool>(development));
     const std::string working((std::istreambuf_iterator<char>(development)), {});
-    REQUIRE_EQ(toml::parse(installed)["keybindings"]["candidate_translation_expand_key"].value_or(std::string()),
+    REQUIRE_EQ(toml::parse(installed)["keybindings"]["candidate_expansion_key"].value_or(std::string()),
                std::string("Backquote"));
-    REQUIRE_EQ(toml::parse(working)["keybindings"]["candidate_translation_expand_key"].value_or(std::string()),
+    REQUIRE_EQ(toml::parse(working)["keybindings"]["candidate_expansion_key"].value_or(std::string()),
                std::string("Backquote"));
     const std::string legacy = "[keybindings]\nswitch_language_shift = true\n";
     const auto added = toml::parse(MergeConfigIntoTemplate(installed, legacy, legacy));
-    REQUIRE_EQ(added["keybindings"]["candidate_translation_expand_key"].value_or(std::string()),
-               std::string("Backquote"));
-    const std::string disabled = legacy + "candidate_translation_expand_key = \"\"\n";
+    REQUIRE_EQ(added["keybindings"]["candidate_expansion_key"].value_or(std::string()), std::string("Backquote"));
+    const std::string disabled = legacy + "candidate_expansion_key = \"\"\n";
     const auto merged = toml::parse(MergeConfigIntoTemplate(installed, disabled, legacy));
-    REQUIRE_EQ(merged["keybindings"]["candidate_translation_expand_key"].value_or(std::string("missing")),
-               std::string(""));
+    REQUIRE_EQ(merged["keybindings"]["candidate_expansion_key"].value_or(std::string("missing")), std::string(""));
     REQUIRE(merged["keybindings"]["switch_language_shift"].value_or(false));
 }
 

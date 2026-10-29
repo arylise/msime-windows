@@ -601,3 +601,26 @@ TEST_CASE(candidate_arrangement_reflows_when_the_final_slot_is_narrower)
     REQUIRE(list.OnMouseUp({20, 44}, 0));
     REQUIRE(activated == 1);
 }
+
+TEST_CASE(popup_right_leading_anchors_beyond_the_anchor_right_edge_top_aligned)
+{
+    auto child = MakeFixed(60.0f, 40.0f);
+    Popup popup(child);
+    popup.SetPadding({0.0f, 0.0f, 0.0f, 0.0f});
+    popup.SetMatchAnchorWidth(false);
+    popup.SetPlacement(PopupPlacement::RightLeading);
+    popup.SetOffset(6.0f, 0.0f);
+    popup.SetAnchorRect({100.0f, 50.0f, 200.0f, 30.0f});
+    popup.SetConstrainToViewport(true);
+    popup.LayoutOverlay({800.0f, 600.0f});
+    REQUIRE_NEAR(popup.GetBounds().x, 306.0f);
+    REQUIRE_NEAR(popup.GetBounds().y, 50.0f);
+    REQUIRE_NEAR(popup.GetBounds().width, 60.0f);
+    REQUIRE_NEAR(popup.GetBounds().height, 40.0f);
+
+    // 锚点靠近视口下缘时顶边被夹回可见区域，仍贴在锚点右缘。
+    popup.SetAnchorRect({100.0f, 560.0f, 200.0f, 30.0f});
+    popup.LayoutOverlay({800.0f, 600.0f});
+    REQUIRE_NEAR(popup.GetBounds().x, 306.0f);
+    REQUIRE_NEAR(popup.GetBounds().y, 600.0f - 40.0f - 8.0f);
+}

@@ -146,8 +146,8 @@ HRESULT CMetasequoiaIME::_HandleCandidateFinalizeForVKReturn(TfEditCookie ec, _I
     HRESULT hr = S_OK;
     WCHAR committedLastChar = 0;
 
-    // 面板打开时回车与空格同路：服务端用 CommitExactText 把高亮英文译义作为本次请求的回复
-    // 预取进缓存，这里读出来直接上屏。普通回车服务端只回一帧 NavigationIgnored（引擎已消费
+    // 面板打开时只有空格走 CommitExactText（服务端把面板选中项作为本次请求的回复预取进缓存，
+    // 这里读出来直接上屏）。回车无论面板开否服务端都只回一帧 NavigationIgnored（引擎已消费
     // 该键），落到下面的本地原始输入上屏，行为与改动前一致。
     UINT serverMsgType = Global::DataFromServerMsgType::OutofRange;
     std::wstring serverCandidateString;

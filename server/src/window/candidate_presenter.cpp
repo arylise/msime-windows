@@ -854,23 +854,38 @@ bool CandidatePresenter::PrepareExpansionPanel(float &needWidthDip, float &needH
     constexpr int kMaxPanelColumns = 6;
     constexpr float kPanelColumnGapDip = 8.0f;
 
-    // 面板锚在卡片下沿，可用空间是「卡片下沿到显示器下沿」与「卡片左边到显示器右边」。卡片顶边
+    // 位置选项：right = 面板放在候选窗右侧（左缘贴候选窗右缘留间距，顶边跟随高亮候选上下移动）；
+    // 其余取值一律按当前方案摆在选定候选词正下方。
+    const std::string placementValue = GetConfiguredCandidateExpansionPanelPlacement();
+    const bool placeRight = placementValue == "right";
+
+    // 摆在下方时锚在卡片下沿，可用空间是「卡片下沿到显示器下沿」与「卡片左边到显示器右边」。卡片顶边
     // 在屏幕上约落在插入符处（候选窗贴着插入符），据此估算；估算偏保守只会更早转多列，不会让面板
     // 越出屏幕（宿主本身也会被夹到显示器边界）。
     const MonitorCoordinates monitor = GetMonitorCoordinatesFromPoint(caret);
     const float cardBottomScreenY = static_cast<float>(caret.y) + anchor.height * scale;
-    const float availableHeightDip =
+    const float belowAvailableHeightDip =
         (static_cast<float>(monitor.bottom) - cardBottomScreenY) / scale - kPanelGapDip - 8.0f;
-    const float availableWidthDip = (static_cast<float>(monitor.right) - static_cast<float>(caret.x)) / scale - 8.0f;
+    const float belowAvailableWidthDip =
+        (static_cast<float>(monitor.right) - static_cast<float>(caret.x)) / scale - 8.0f;
+    // 摆在右方时可用宽度是「卡片右沿到显示器右沿」减去间距，可用高度是整个候选窗以下。
+    // 右侧空间放不下一个像样的面板时不硬挤，直接按下方摆。
+    const float rightAvailableWidthDip =
+        (static_cast<float>(monitor.right) - (static_cast<float>(caret.x) + anchor.width * scale)) / scale -
+        kPanelGapDip - 8.0f;
+    const float rightAvailableHeightDip =
+        (static_cast<float>(monitor.bottom) - static_cast<float>(caret.y)) / scale - 8.0f;
+    bool useRight = placeRight && rightAvailableWidthDip >= 120.0f;
+    float availableHeightDip = useRight ? rightAvailableHeightDip : belowAvailableHeightDip;
+    float availableWidthDip = useRight ? rightAvailableWidthDip : belowAvailableWidthDip;
 
     // 字体、字号、配色、选中样式、数字标全部沿用主候选列表的外观（皮肤配色），这样两框看起来是一套。
     // 面板没有辅助码、没有行内译文；每行前带与中文候选一致的 1..N 数字标（按数字直接上屏对应译义）；
-    // 强制竖排（关掉横排的网格/铺满/最小列宽）。「保持宽度」关掉 fitContent 让它铺满卡片宽度；
-    // 「自适应」打开 fitContent 让列表按最长内容测宽。
-    const bool adaptive = GetConfiguredCandidateTranslationPanelPosition() == "adaptive";
+    // 强制竖排（关掉横排的网格/铺满/最小列宽）。面板按内容自适应宽度（fitContent 让列表按最长内容测宽），
+    // 并与当前高亮候选所在列对齐。
     auto list = std::make_shared<msimeui::CandidateList>();
     msimeui::CandidateList::Appearance appearance = impl_->list->GetAppearance();
-    appearance.fitContent = adaptive;
+    appearance.fitContent = true;
     appearance.gridColumns = 0;
     appearance.justifyHorizontalRows = false;
     appearance.minItemWidth = 0.0f;
@@ -900,22 +915,29 @@ bool CandidatePresenter::PrepareExpansionPanel(float &needWidthDip, float &needH
         anchor.x + (static_cast<float>(monitor.right) - static_cast<float>(caret.x)) / scale;
 
     // 先按单列测一次：把高度上界设成可用高度，单列放不下时返回值会被夹到可用高度，从而可靠地判定
-    // 「单列会越过下边缘」。「保持宽度」按卡片内宽测（铺满卡片）；「自适应」按可用宽度测（fitContent
-    // 让列表只占最长内容那么宽）。
-    const float singleBudgetWidth = adaptive ? (std::max)(availableWidthDip, innerWidth) : innerWidth;
-    const msimeui::SizeF single = list->MeasureInLayout({singleBudgetWidth, (std::max)(availableHeightDip, 1.0f)});
+    // 「单列会越过下边缘」。按可用宽度测（fitContent 让列表只占最长内容那么宽）。
+    float singleBudgetWidth = useRight ? availableWidthDip : (std::max)(availableWidthDip, innerWidth);
+    msimeui::SizeF single = list->MeasureInLayout({singleBudgetWidth, (std::max)(availableHeightDip, 1.0f)});
+    // 最长一条本身就比右侧可用宽度还宽时，面板会顶出屏幕边缘，改按下方摆。
+    if (useRight && single.width > availableWidthDip + 1.0f)
+    {
+        useRight = false;
+        availableHeightDip = belowAvailableHeightDip;
+        availableWidthDip = belowAvailableWidthDip;
+        singleBudgetWidth = (std::max)(availableWidthDip, innerWidth);
+        single = list->MeasureInLayout({singleBudgetWidth, (std::max)(availableHeightDip, 1.0f)});
+    }
     const float singlePanelHeight = single.height + pad.top + pad.bottom;
     const bool multiColumn = singlePanelHeight > availableHeightDip;
 
     float panelWidth = anchor.width;
     float panelHeight = singlePanelHeight;
-    bool matchAnchorWidth = !adaptive;
     if (multiColumn)
     {
         // 多列：把列高/列宽预算写进外观，弹窗之后以宿主视口重新测量也会得到同一布局。列高预算取
         // 卡片下沿到显示器下沿减去间距，列宽预算取卡片左边到显示器右边；列数受 kMaxPanelColumns 与
         // 列宽预算双重限制，放不下时末列在底部裁切。列宽预算用可用宽度（不是卡片内宽），这样测出来的是
-        // 按高度排布的自然列总宽，再据此决定面板要不要比卡片宽。
+        // 按高度排布的自然列总宽，面板宽度就是多列自然宽度，不跟卡片对齐。
         const float colHeight = (std::max)(availableHeightDip - kPanelGapDip, 1.0f);
         const float colBudgetWidth = (std::max)(availableWidthDip, 1.0f);
         msimeui::CandidateList::Appearance colAppearance = list->GetAppearance();
@@ -925,65 +947,71 @@ bool CandidatePresenter::PrepareExpansionPanel(float &needWidthDip, float &needH
         colAppearance.columnBudgetWidth = colBudgetWidth;
         list->SetAppearance(std::move(colAppearance));
         const msimeui::SizeF multi = list->MeasureInLayout({colBudgetWidth, colHeight});
-        const float naturalWidth = multi.width + pad.left + pad.right;
+        panelWidth = multi.width + pad.left + pad.right;
         panelHeight = multi.height + pad.top + pad.bottom;
-        if (adaptive)
-        {
-            // 自适应：面板宽度就是多列自然宽度，不跟卡片对齐。
-            panelWidth = naturalWidth;
-            matchAnchorWidth = false;
-        }
-        else if (naturalWidth <= anchor.width)
-        {
-            // 保持宽度：多列自然宽度没超过候选卡片就仍与候选窗同宽，列内容左对齐、右侧留白；
-            // 列布局由列宽预算（可用宽度）决定，不会被卡片内宽压回更少列。
-            panelWidth = anchor.width;
-            matchAnchorWidth = true;
-        }
-        else
-        {
-            // 保持宽度：多列自然宽度超过候选卡片时才让面板向右拓展到自然宽度。
-            panelWidth = naturalWidth;
-            matchAnchorWidth = false;
-        }
     }
-    else if (adaptive)
+    else
     {
         // 自适应单列：按最长内容测宽。
         panelWidth = single.width + pad.left + pad.right;
-        matchAnchorWidth = false;
     }
 
-    // 面板左缘（窗口坐标）。保持宽度：与卡片左边对齐。自适应：与当前高亮候选同一列——让面板内容左缘
-    // 对齐高亮项左缘（item.x = 卡片内列表里该项的左缘），即 panelLeft = item.x - pad.left；竖排单列时
-    // 它等于卡片左边。右侧将要溢出屏幕时丢失对齐，把面板右缘贴到屏幕右缘。
+    // 面板左缘（窗口坐标）：摆在下方时与当前高亮候选同一列——让面板内容左缘对齐高亮项左缘
+    // （item.x = 卡片内列表里该项的左缘），即 panelLeft = item.x - pad.left；竖排单列时它等于卡片左边。
+    // 右侧将要溢出屏幕时丢失对齐，把面板右缘贴到屏幕右缘。
+    // 摆在右方时左缘固定在候选窗右缘加间距，顶边与高亮项顶边对齐、随高亮切换上下移动；
+    // 底边越过显示器下沿时向上回退，但不越过候选窗顶边。
     float panelLeft = anchor.x;
-    if (adaptive)
+    float panelTop = anchor.y;
     {
         const msimeui::RectF item = impl_->list->GetItemBounds(static_cast<size_t>(anchorIndex));
-        if (item.width > 0.0f)
-            panelLeft = item.x - pad.left;
-        if (panelLeft + panelWidth > screenRightWindowX)
-            panelLeft = (std::max)(0.0f, screenRightWindowX - panelWidth);
+        if (useRight)
+        {
+            panelLeft = anchor.x + anchor.width + kPanelGapDip;
+            if (item.height > 0.0f)
+                panelTop = item.y;
+            const float screenBottomWindowY =
+                anchor.y + (static_cast<float>(monitor.bottom) - static_cast<float>(caret.y)) / scale;
+            if (panelTop + panelHeight > screenBottomWindowY)
+                panelTop = (std::max)(anchor.y, screenBottomWindowY - panelHeight);
+        }
+        else
+        {
+            if (item.width > 0.0f)
+                panelLeft = item.x - pad.left;
+            if (panelLeft + panelWidth > screenRightWindowX)
+                panelLeft = (std::max)(0.0f, screenRightWindowX - panelWidth);
+        }
     }
 
     auto popup = std::make_shared<msimeui::Popup>(list);
-    // 保持宽度：单列与多列未超出时宽度跟随候选卡片，与中文候选窗对齐；超出或自适应时按测得的宽度排布。
+    // 面板宽度按测得的内容宽度排布，不跟随候选卡片。
     // 边框与圆角复用卡片那套。内边距复用候选卡片的外缘内边距，让面板里高亮与边框的间距和中文候选窗一致。
-    popup->SetMatchAnchorWidth(matchAnchorWidth);
+    popup->SetMatchAnchorWidth(false);
     popup->SetPadding(pad);
     popup->SetBackgroundFill(impl_->cardFill);
     popup->SetBorderColor(impl_->cardBorder);
     popup->SetCornerRadius(impl_->cardRadiusDip);
     popup->SetShadowEnabled(true);
-    popup->SetPlacement(msimeui::PopupPlacement::BelowLeading);
-    popup->SetOffset(0.0f, kPanelGapDip);
     popup->SetConstrainToViewport(true);
-    // 锚点仍取卡片下沿（y/height 用卡片），只把左缘换成 panelLeft，保证面板贴在候选窗下方。
-    popup->SetAnchorRect({panelLeft, anchor.y, anchor.width, anchor.height});
-
-    needWidthDip = (std::max)(anchor.x + anchor.width, panelLeft + panelWidth) + 8.0f;
-    needHeightDip = anchor.y + anchor.height + kPanelGapDip + panelHeight + 8.0f;
+    if (useRight)
+    {
+        // 锚矩形取整张卡片（x/width 用卡片），顶边换成 panelTop：面板贴在候选窗右缘、与高亮候选对齐。
+        popup->SetPlacement(msimeui::PopupPlacement::RightLeading);
+        popup->SetOffset(kPanelGapDip, 0.0f);
+        popup->SetAnchorRect({anchor.x, panelTop, anchor.width, anchor.height});
+        needWidthDip = (std::max)(anchor.x + anchor.width, panelLeft + panelWidth) + 8.0f;
+        needHeightDip = (std::max)(anchor.y + anchor.height, panelTop + panelHeight) + 8.0f;
+    }
+    else
+    {
+        popup->SetPlacement(msimeui::PopupPlacement::BelowLeading);
+        popup->SetOffset(0.0f, kPanelGapDip);
+        // 锚点仍取卡片下沿（y/height 用卡片），只把左缘换成 panelLeft，保证面板贴在候选窗下方。
+        popup->SetAnchorRect({panelLeft, anchor.y, anchor.width, anchor.height});
+        needWidthDip = (std::max)(anchor.x + anchor.width, panelLeft + panelWidth) + 8.0f;
+        needHeightDip = anchor.y + anchor.height + kPanelGapDip + panelHeight + 8.0f;
+    }
 
     impl_->translationPanelList = std::move(list);
     impl_->translationPanel = std::move(popup);

@@ -31,10 +31,10 @@ struct SwitchLanguageHotkeys
     bool ctrl_alt_space = true;
     bool character_set_ctrl_shift_f = true;
     bool commit_pinyin_shift_enter = true;
-    FanyImeKeyChord::Binding candidate_translation_expand_key = FanyImeCandidateActionKey::DefaultBinding();
-    // general.candidate_translation_panel_enabled: master switch for the expand panel. When off the
+    FanyImeKeyChord::Binding candidate_expansion_key = FanyImeCandidateActionKey::DefaultBinding();
+    // general.candidate_expansion_panel_enabled: master switch for the expand panel. When off the
     // expand key is not eaten at all. Defaults to true, matching the shipped config template.
-    bool candidate_translation_panel_enabled = true;
+    bool candidate_expansion_panel_enabled = true;
     FanyImeInputStateShortcuts::Snapshot input_state;
 };
 // Read keybindings.switch_language_* from shared config.toml.
@@ -62,9 +62,9 @@ LanguageBarVisibility ReadConfiguredLanguageBarVisibility();
 bool ReadConfiguredCandidateTranslationsEnabled();
 
 // Whether this key is the configured candidate translation expand key.
-// IsCandidateTranslationExpandShortcut matches only modifier chords (Ctrl / Ctrl+Shift);
-// bare Backquote is handled by IsCandidateTranslationExpandBareKey so that helpcode
+// IsCandidateExpansionShortcut matches only modifier chords (Ctrl / Ctrl+Shift);
+// bare Backquote is handled by IsCandidateExpansionBareKey so that helpcode
 // classification can run first in the synchronous and deferred paths.
-bool IsCandidateTranslationExpandShortcut(UINT code, UINT modifiers);
-bool IsCandidateTranslationExpandBareKey(UINT code, WCHAR wch);
+bool IsCandidateExpansionShortcut(UINT code, UINT modifiers);
+bool IsCandidateExpansionBareKey(UINT code, WCHAR wch);
 } // namespace FanyUtils

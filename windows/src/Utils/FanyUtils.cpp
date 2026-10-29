@@ -439,9 +439,9 @@ SwitchLanguageHotkeys ParseSwitchLanguageHotkeys(const std::filesystem::path &co
         }
         const std::string key = TrimAscii(line.substr(0, eq));
         const std::string raw = line.substr(eq + 1);
-        if (inGeneral && key == "candidate_translation_panel_enabled")
+        if (inGeneral && key == "candidate_expansion_panel_enabled")
         {
-            result.candidate_translation_panel_enabled = ParseTomlBool(raw, true);
+            result.candidate_expansion_panel_enabled = ParseTomlBool(raw, true);
         }
         else if (key == "switch_language_shift")
         {
@@ -466,11 +466,11 @@ SwitchLanguageHotkeys ParseSwitchLanguageHotkeys(const std::filesystem::path &co
         {
             result.commit_pinyin_shift_enter = ParseTomlBool(raw, true);
         }
-        else if (key == "candidate_translation_expand_key")
+        else if (key == "candidate_expansion_key")
         {
             const std::string_view value = FanyImeKeyChord::TomlString(raw);
-            if (!FanyImeCandidateActionKey::Parse(value, result.candidate_translation_expand_key))
-                result.candidate_translation_expand_key = {};
+            if (!FanyImeCandidateActionKey::Parse(value, result.candidate_expansion_key))
+                result.candidate_expansion_key = {};
         }
         else if (key == "switch_language" && !sawShift && !sawCtrlAltSpace)
         {
@@ -794,26 +794,26 @@ string::size_type count_utf8_chars(const string &str)
     return utf8::distance(str.begin(), str.end());
 }
 
-bool IsCandidateTranslationExpandShortcut(UINT code, UINT modifiers)
+bool IsCandidateExpansionShortcut(UINT code, UINT modifiers)
 {
     if ((GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 || (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0)
         return false;
     // 行内译文注释（general.candidate_translations）关掉不影响展开键：面板的译文查询在 Server 侧
-    // 与行内显示解耦。面板总开关（general.candidate_translation_panel_enabled）关掉时这颗键不吃。
+    // 与行内显示解耦。面板总开关（general.candidate_expansion_panel_enabled）关掉时这颗键不吃。
     const SwitchLanguageHotkeys hotkeys = ReadConfiguredSwitchLanguageHotkeys();
-    const FanyImeKeyChord::Binding &binding = hotkeys.candidate_translation_expand_key;
-    if (!hotkeys.candidate_translation_panel_enabled || binding.key == 0 || binding.modifiers == 0)
+    const FanyImeKeyChord::Binding &binding = hotkeys.candidate_expansion_key;
+    if (!hotkeys.candidate_expansion_panel_enabled || binding.key == 0 || binding.modifiers == 0)
         return false;
     return binding.Matches(code, modifiers);
 }
 
-bool IsCandidateTranslationExpandBareKey(UINT code, WCHAR wch)
+bool IsCandidateExpansionBareKey(UINT code, WCHAR wch)
 {
     if ((GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 || (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0)
         return false;
     const SwitchLanguageHotkeys hotkeys = ReadConfiguredSwitchLanguageHotkeys();
-    const FanyImeKeyChord::Binding &binding = hotkeys.candidate_translation_expand_key;
-    return hotkeys.candidate_translation_panel_enabled && binding.key == VK_OEM_3 && binding.modifiers == 0 &&
+    const FanyImeKeyChord::Binding &binding = hotkeys.candidate_expansion_key;
+    return hotkeys.candidate_expansion_panel_enabled && binding.key == VK_OEM_3 && binding.modifiers == 0 &&
            code == VK_OEM_3 && wch == L'`';
 }
 } // namespace FanyUtils

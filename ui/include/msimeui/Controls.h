@@ -17,6 +17,8 @@ enum class PopupPlacement
 {
     BelowLeading,
     AboveLeading,
+    // 贴锚点右缘、顶边与锚点顶边对齐（x = anchor.x + anchor.width + offsetX）。
+    RightLeading,
 };
 
 class Image : public Visual

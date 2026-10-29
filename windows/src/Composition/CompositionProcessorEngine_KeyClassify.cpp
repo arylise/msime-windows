@@ -385,7 +385,7 @@ BOOL CCompositionProcessorEngine::IsVirtualKeyNeed( //
     // 只在候选窗激活、有输入、非日语模式且翻译开关开着时吃键。
     if (candidateMode != CANDIDATE_NONE && _keystrokeBuffer.GetLength() > 0 &&
         !IsJapaneseKeyMode(_keystrokeBuffer.Get(), _keystrokeBuffer.GetLength()) &&
-        FanyUtils::IsCandidateTranslationExpandBareKey(uCode, pwch ? *pwch : 0))
+        FanyUtils::IsCandidateExpansionBareKey(uCode, pwch ? *pwch : 0))
     {
         if (pKeyState)
         {
