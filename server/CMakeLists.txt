@@ -256,6 +256,7 @@ set(SRC_FILES
     "./src/ipc/event_listener_keys.cpp"
     "./src/ipc/event_listener_pipes.cpp"
     "./src/ipc/event_listener_selection.cpp"
+    "./src/ipc/event_listener_task_class.cpp"
     "./src/ipc/event_listener_worker.cpp"
     "./src/ipc/ipc.cpp"
     "./src/ipc/ipc.h"
@@ -269,6 +270,8 @@ set(SRC_FILES
     "./src/log/fanylog.h"
     "./src/log/candidate_diag_log.cpp"
     "./src/log/candidate_diag_log.h"
+    "./src/log/diagnostic_log_naming.cpp"
+    "./src/log/diagnostic_log_naming.h"
     "./src/log/ftb_diag_log.h"
     "./src/resource/resource.h"
     "./src/resource/resource.rc"
@@ -290,6 +293,8 @@ set(SRC_FILES
     "./src/skin/candidate_skin_catalog.h"
     "./src/session/engine_input_session.cpp"
     "./src/session/engine_input_session.h"
+    "./src/session/input_cadence.cpp"
+    "./src/session/input_cadence.h"
     "./src/session/input_session.h"
     "./src/session/session_factory.cpp"
     "./src/session/session_factory.h"
@@ -724,6 +729,10 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         ${CMAKE_BINARY_DIR}/opencc/data/STCharacters.ocd2
         ${CMAKE_BINARY_DIR}/opencc/data/STPhrases.ocd2
         ${CMAKE_BINARY_DIR}/opencc/data/STPhrases_GeneratedFromRegionalPhrases.ocd2
+        ${MSIME_VENDOR_DIR}/opencc/data/config/t2s.json
+        ${CMAKE_BINARY_DIR}/opencc/data/TSCharacters.ocd2
+        ${CMAKE_BINARY_DIR}/opencc/data/TSCharactersExt.ocd2
+        ${CMAKE_BINARY_DIR}/opencc/data/TSPhrases.ocd2
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets/opencc
 )
 

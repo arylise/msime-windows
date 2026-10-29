@@ -113,6 +113,11 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_selection_replay_guard.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_serial_task_runner.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/serial_task_runner.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_task_classes.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ipc/event_listener_task_class.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_input_cadence.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_sentence_association_options.cpp"
+    "${CMAKE_SOURCE_DIR}/src/session/input_cadence.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_shuangpin_preedit_display.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/shuangpin_preedit_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_wheel_paging.cpp"
@@ -122,6 +127,8 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_size_estimator.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/candidate_size_estimator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ipc_protocol_constants.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_diagnostic_log_naming.cpp"
+    "${CMAKE_SOURCE_DIR}/src/log/diagnostic_log_naming.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_composition_pipe.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_providers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_vendor.cpp"
@@ -150,6 +157,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_skin_catalog_page_arrows.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_skin_catalog_supports.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_skin_catalog_toolbar_image.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_skin_catalog_border_image_vertical.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_skin_palette.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_non_ascii_path_contract.cpp"
     "${CMAKE_SOURCE_DIR}/src/skin/candidate_skin_catalog.cpp"
@@ -299,6 +307,19 @@ target_link_libraries(MetasequoiaImeSettingsUiTests PRIVATE
     shell32
 )
 add_test(NAME MetasequoiaImeSettingsUiTests COMMAND MetasequoiaImeSettingsUiTests)
+
+# 繁简转换走真实的 OpenCC。转换器从 exe 所在目录的 assets/opencc 读字典，这个目录由 server 的
+# POST_BUILD 拷出，测试程序与 server 输出到同一个 bin 目录，所以先构建 server。
+# 拷贝清单漏了字典时，只有干净构建会让它失败：增量构建里 copy_if_different 不删除已有的旧文件。
+add_executable(test_chinese_converter
+    portable/main.cpp
+    src/test_chinese_converter.cpp
+    ../src/conversion/chinese_converter.cpp)
+target_include_directories(test_chinese_converter PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/src")
+target_compile_definitions(test_chinese_converter PRIVATE NOMINMAX=1)
+target_link_libraries(test_chinese_converter PRIVATE OpenCC::OpenCC)
+add_dependencies(test_chinese_converter MetasequoiaImeServer)
+add_test(NAME chinese_converter COMMAND test_chinese_converter)
 
 # The identical fixture file also runs in Engine's JavaScript contract CI.
 add_executable(test_webview_contract "${MSIME_ENGINE_DIR}/contracts/webview/test.cpp")

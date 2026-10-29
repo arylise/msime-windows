@@ -448,6 +448,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
              }()},
             {"sentence_neural_desktop_model_url", neural_model::SourceUrl()},
             {"sentence_neural_keyboard", GetConfiguredAssocSentenceNeuralKeyboard()},
+            {"context_candidate_rerank", GetConfiguredAssocContextCandidateRerank()},
             {"sentence_show_next_on_duplicate", GetConfiguredAssocSentenceShowNextOnDuplicate()},
             {"sentence_source_badge", GetConfiguredAssocSentenceSourceBadge()},
             {"sentence_collocation_enabled", GetConfiguredAssocSentenceCollocationEnabled()},
@@ -904,6 +905,8 @@ bool ApplyConfigUpdate(const json::object &data)
         return SetConfiguredAssocSentenceGoogle(json::value_to<bool>(data.at("value")));
     if (path == "association.sentence_neural_desktop")
         return SetConfiguredAssocSentenceNeuralDesktop(json::value_to<bool>(data.at("value")));
+    if (path == "association.context_candidate_rerank")
+        return SetConfiguredAssocContextCandidateRerank(json::value_to<bool>(data.at("value")));
     if (path == "association.sentence_neural_keyboard")
         return SetConfiguredAssocSentenceNeuralKeyboard(json::value_to<bool>(data.at("value")));
     if (path == "association.sentence_show_next_on_duplicate")
@@ -1385,6 +1388,16 @@ void HandleClientMessage(HWND hwnd, const std::string &raw)
             std::filesystem::create_directories(skins, ec);
             if (!ec)
                 ShellExecuteW(hwnd, L"open", skins.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        }
+        else if (type == "openLogDirectory")
+        {
+            // Keep in sync with the writer in src/log/candidate_diag_log.cpp: the
+            // diagnostics live under the data directory, not on the Desktop.
+            const std::filesystem::path logs = std::filesystem::path(CommonUtils::get_ime_data_path_w()) / L"logs";
+            std::error_code ec;
+            std::filesystem::create_directories(logs, ec);
+            if (!ec)
+                ShellExecuteW(hwnd, L"open", logs.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
         }
         else if (type == "openHelpcodeDirectory")
         {
