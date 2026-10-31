@@ -154,9 +154,9 @@ bool g_english_candidates_enabled = false;
 bool g_candidate_translations_enabled = false;
 bool g_candidate_expansion_panel_enabled = true;
 bool g_candidate_expansion_panel_translation = true;
-bool g_candidate_expansion_panel_emoji = false;
-bool g_candidate_expansion_panel_kaomoji = false;
-bool g_candidate_expansion_panel_symbols = false;
+bool g_candidate_expansion_panel_emoji = true;
+bool g_candidate_expansion_panel_kaomoji = true;
+bool g_candidate_expansion_panel_symbols = true;
 int g_candidate_expansion_panel_translation_max_count = kCandidateExpansionPanelMaxCountDefault;
 int g_candidate_expansion_panel_emoji_max_count = kCandidateExpansionPanelMaxCountDefault;
 int g_candidate_expansion_panel_kaomoji_max_count = kCandidateExpansionPanelMaxCountDefault;
@@ -662,9 +662,9 @@ bool LoadImeConfig()
         g_candidate_expansion_panel_enabled = tbl["general"]["candidate_expansion_panel_enabled"].value_or(true);
         g_candidate_expansion_panel_translation =
             tbl["general"]["candidate_expansion_panel_translation"].value_or(true);
-        g_candidate_expansion_panel_emoji = tbl["general"]["candidate_expansion_panel_emoji"].value_or(false);
-        g_candidate_expansion_panel_kaomoji = tbl["general"]["candidate_expansion_panel_kaomoji"].value_or(false);
-        g_candidate_expansion_panel_symbols = tbl["general"]["candidate_expansion_panel_symbols"].value_or(false);
+        g_candidate_expansion_panel_emoji = tbl["general"]["candidate_expansion_panel_emoji"].value_or(true);
+        g_candidate_expansion_panel_kaomoji = tbl["general"]["candidate_expansion_panel_kaomoji"].value_or(true);
+        g_candidate_expansion_panel_symbols = tbl["general"]["candidate_expansion_panel_symbols"].value_or(true);
         {
             auto read_panel_max = [&](const char *key) {
                 const int value = tbl["general"][key].value_or(kCandidateExpansionPanelMaxCountDefault);
