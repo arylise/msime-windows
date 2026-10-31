@@ -65,18 +65,15 @@ candidate_translations = false
 candidate_translation_show_pos = true
 # 候选译文只显示第一条释义，关闭时最多显示两条
 candidate_translation_single_sense = false
-# 候选词展开面板：按展开键在高亮候选下方弹出竖排面板，与行内译文注释相互独立
+# 候选词展开面板：按展开键默认在高亮候选下方弹出竖排面板，当切换输入法纵向布局，建议将转开面板切换到右侧
 candidate_expansion_panel_enabled = true
-# 展开面板里的「翻译」类别：关闭后面板不再列出译义（整体开关仍开时其它类别仍可占位）
+# 展开面板里的「翻译」类别：关闭后面板不再列出译义
 candidate_expansion_panel_translation = true
 # 展开面板里的「表情」类别：按高亮候选整词匹配 emoji 关键词，在面板中列出对应 emoji
-# （出厂默认关闭；开发配置打开，方便本地实测。产品默认见 config.default.toml）
 candidate_expansion_panel_emoji = true
 # 展开面板里的「颜文字」类别：按高亮候选整词匹配颜文字关键词，在面板中列出对应颜文字
-# （出厂默认关闭；开发配置打开，方便本地实测。产品默认见 config.default.toml）
 candidate_expansion_panel_kaomoji = true
 # 展开面板里的「符号」类别：按高亮候选整词匹配符号关键词，在面板中列出对应符号
-# （出厂默认关闭；开发配置打开，方便本地实测。产品默认见 config.default.toml）
 candidate_expansion_panel_symbols = true
 # 展开面板里每个类别各自最多列出的条数（0–9，出厂默认 5；0 = 不限制条数）：翻译 / 表情 / 颜文字 / 符号互不影响
 candidate_expansion_panel_translation_max_count = 5
