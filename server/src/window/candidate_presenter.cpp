@@ -906,6 +906,14 @@ bool CandidatePresenter::PrepareExpansionPanel(float &needWidthDip, float &needH
     }
     list->SetItems(std::move(items));
     list->SetSelectedIndex(static_cast<size_t>((std::max)(0, page.expansion_panel_selected)));
+    // 面板里点选一条译义：与数字键 1..N 同一条上屏路径，下标按面板里的顺序交给工作线程。
+    list->SetOnItemActivated([this](size_t index) {
+        if (!hwnd_)
+        {
+            return;
+        }
+        PostMessageW(hwnd_, WM_COMMIT_EXPANSION_PANEL_ITEM, static_cast<WPARAM>(index), 0);
+    });
 
     const msimeui::Thickness pad = impl_->cardContentPad;
     const float innerWidth = (std::max)(1.0f, anchor.width - pad.left - pad.right);

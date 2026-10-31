@@ -42,6 +42,7 @@ TaskClass ClassifyTask(TaskType type)
     case TaskType::UiClearCandidatePosition:
     case TaskType::UiExpandCandidates:
     case TaskType::UiCloseTranslationPanel:
+    case TaskType::UiCommitExpansionPanelItem:
     case TaskType::ExitEnglishInputMode:
     case TaskType::ToolbarLanguageToggle:
         return TaskClass::UserAction;

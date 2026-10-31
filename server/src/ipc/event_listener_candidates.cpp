@@ -20,6 +20,7 @@
 #include "engine/quanpin/quanpin_query.h"
 #include "engine/user_dictionary/user_dictionary_journal.h"
 #include "cloud/cloud_translation.h"
+#include "cloud/translation_gloss.h"
 #include "english/english_ime.h"
 #include "config/ime_config.h"
 #include "ai/jev_candidate_policy.h"
@@ -415,8 +416,9 @@ std::string BuildCurrentCandidatePage()
 
 void PrepareCandidateTranslationRequest()
 {
-    // 行内译文注释（general.candidate_translations）关掉时主列表不显示英文，但展开面板开着且键配好了就要查译文：
-    // 竖排面板的 senses 来自 page_glosses，查询与行内显示解耦。面板总开关关掉时这条查询门控一并关掉。
+    // 行内译文注释（general.candidate_translations）关掉时主列表不显示英文，但展开面板真的开着就要查译文：
+    // 竖排面板的 senses 来自 page_glosses，查询与行内显示解耦。面板没开时这条查询门控一并关掉，
+    // 开面板那颗键的补查见 ProbeTranslationForHighlightedCandidate。
     const bool enabled = FanyNamedPipe::CandidateTranslationLookupEnabled();
     auto &ui = Global::candidate_ui;
     if (IsCandidateSubPageActive())
@@ -562,14 +564,49 @@ namespace FanyNamedPipe
 {
 // 译文查询门控（见 internal.h 声明）。行内显示与查询解耦：这里只决定「要不要查、要不要填
 // page_glosses」，行内是否把英文画到候选右侧由 BuildCurrentCandidatePage 按 candidate_translations
-// 单独控制。展开面板的 senses 来自 page_glosses，所以面板开着就必须查，哪怕行内注释是关的。
+// 单独控制。展开面板的 senses 来自 page_glosses，所以面板真的开着才查（惰性门控：面板没开、
+// 行内又关着时，这条查询对任何用户都不发生）；开面板那颗键由 ProbeTranslationForHighlightedCandidate
+// 给高亮词补上译文，面板开着期间的后续按键再走这条正常路径。
 bool CandidateTranslationLookupEnabled()
 {
     const bool japanese = g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji;
-    const bool panel_translation_active = GetConfiguredCandidateExpansionPanelEnabled() &&
-                                          GetConfiguredCandidateExpansionPanelTranslationEnabled() &&
-                                          !GetConfiguredCandidateExpansionKey().empty();
+    const bool panel_translation_active =
+        Global::candidate_ui.expansion_panel_active && GetConfiguredCandidateExpansionPanelEnabled() &&
+        GetConfiguredCandidateExpansionPanelTranslationEnabled() && !GetConfiguredCandidateExpansionKey().empty();
     return (GetConfiguredCandidateTranslationsEnabled() || panel_translation_active) && !IsUiLessMode() && !japanese;
+}
+
+// 开面板路径的补查（见 internal.h 声明）。只查高亮这一条词：本地词典命中就直接种进 gloss 缓存
+// （调用方随后的 RefreshCandidatePageUi 会重建 page_glosses，面板首开即有数据，不走异步回填）；
+// 本地没命中但配了云端 provider 且这个词云端可译，也返回 true——面板乐观打开，译义类等异步结果
+// 到达后回填。两者都不成立才返回 false，调用方据此拒绝开面板。
+bool ProbeTranslationForHighlightedCandidate()
+{
+    const auto &ui = Global::candidate_ui;
+    const int highlighted = (std::max)(0, ui.selected_index_in_page);
+    const int index = ui.current_page_start() + highlighted;
+    if (index < 0 || index >= static_cast<int>(ui.items.size()))
+    {
+        return false;
+    }
+    EnglishIme::TranslationQuery query;
+    if (!BuildTranslationQuery(ui.items[static_cast<size_t>(index)], query))
+    {
+        return false;
+    }
+    const std::string gloss = EnglishIme::LookupTranslationSync(query);
+    if (!gloss.empty())
+    {
+        g_candidate_translation_glosses[TranslationIdentity(query)] = {std::move(gloss), true};
+        return true;
+    }
+    if (!CloudTranslation::ActiveProviderScope().empty())
+    {
+        return query.direction == EnglishIme::TranslationDirection::EnglishToChinese
+                   ? CloudTranslation::IsCloudTranslatableEnglish(query.key)
+                   : CloudTranslation::IsCloudTranslatableChinese(query.key);
+    }
+    return false;
 }
 
 std::string CurrentRankingContextKey()

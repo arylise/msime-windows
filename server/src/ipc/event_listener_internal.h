@@ -196,6 +196,8 @@ enum class TaskType
     UiExpandCandidates,
     // 竖排译文面板被点了外面：presenter 请工作线程把面板状态关掉。
     UiCloseTranslationPanel,
+    // 候选词展开面板里点选了某条译义：与数字键 1..N 上屏同一条路径。
+    UiCommitExpansionPanelItem,
     ReloadInputSession,
     EnsureInputSessionMatchesConfig,
     ApplyCandidatePageSize,
@@ -327,10 +329,16 @@ void ApplyAiCandidate(const std::string &candidate, const std::string &identity,
                       const std::optional<metasequoia::OnlineQuery> &query);
 void ApplyEnglishCandidates(std::vector<WordItem> candidates, const std::string &input, uint64_t generation);
 void ApplyCandidateTranslations(std::vector<EnglishIme::TranslationResult> results, uint64_t generation, bool merge);
-// 译文查询门控：行内注释（candidate_translations）或「展开面板已开且配好展开键」任一成立就要查译文；
-// 行内是否显示另由 candidate_translations 单独控制。查询与显示解耦，PrepareCandidateTranslationRequest
-// 与 ApplyCandidateTranslations 共用这一份判断，避免一边放宽另一边仍卡住导致 page_glosses 为空。
+// 译文查询门控：行内注释（candidate_translations）或「展开面板真的开着（expansion_panel_active）且
+// 配好展开键」任一成立就要查译文；行内是否显示另由 candidate_translations 单独控制。查询与显示解耦，
+// PrepareCandidateTranslationRequest 与 ApplyCandidateTranslations 共用这一份判断，避免一边放宽另一边
+// 仍卡住导致 page_glosses 为空。面板分支看的是打开状态而不是配置：面板没开、行内又关着时这条查询
+// 不发生（出厂默认因此不再让所有用户每键都查译文），开面板那颗键靠下面的探测函数补高亮词的译文。
 bool CandidateTranslationLookupEnabled();
+// 候选展开键的开面板路径专用：面板条目为空且译义类启用时调用。同步探测高亮词（english.db 一次
+// 索引查询，命中即种进 gloss 缓存），或「配了云端 provider 且云端可译」时返回 true 让面板乐观打开、
+// 译义类异步回填；都不成立返回 false，调用方据此不开面板。
+bool ProbeTranslationForHighlightedCandidate();
 // 候选展开面板：当前高亮候选按启用类别平铺出的条目（含上屏文本与类别前缀标签）。发布快照与
 // 按键路径（移动/上屏/数字选词）共用同一份，保证「面板里看到的」与「上屏的」来自同一次管线。
 // CurrentExpansionCategoryOrder 按各启用类别的开关拼出启用顺序（当前：翻译、表情、颜文字）。
@@ -339,6 +347,10 @@ bool CandidateTranslationLookupEnabled();
 std::vector<std::string> CurrentExpansionCategoryOrder();
 std::vector<FanyImeIpc::ExpansionItem> CurrentExpansionPanelItems();
 std::string CurrentExpansionAnchorWord();
+// 面板条目上屏的公共内核：先等渲染同步再取当前面板条目，forced_index 指定面板下标（-1 用高亮位），
+// 无论成败都关掉面板。上屏成功返回 true 并已置好 CommitExactText 与 selected_text；调用方负责投递
+// （按键路径走 SendCurrentDataToClient，候选窗点击走 worker packet）。见 event_listener_keys.cpp。
+bool CommitCandidateExpansionPanelSenseText(int forced_index, UINT render_sync_keycode);
 void ApplyMixedCandidates(MixedCandidates::Result result, const std::string &input, uint64_t generation);
 void EnqueueStoreUserPhraseTask(const std::string &pinyin, const std::string &word, bool pinyin_is_canonical = false);
 bool ResolveCandidateItem(int one_based_index, WordItem &item);
