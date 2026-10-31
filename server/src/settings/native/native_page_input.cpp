@@ -1927,7 +1927,9 @@ VisualPtr BuildInputPage(PageContext &context)
         };
         auto options = Col(
             {std::make_shared<Divider>(Divider::Kind::Option),
-             LanguageRow(L"翻译", L"在面板中列出高亮候选的译义，最多列到下面设的上限；关闭后面板不再显示译文",
+             LanguageRow(L"翻译",
+                         L"在面板中列出高亮候选的译义，与「候选词翻译」使用同一个翻译源（本地词库与所配置的在线服务），"
+                         L"最多列到下面设的上限；关闭后面板不再显示译文",
                          dim(translationCat)),
              LanguageRow(L"翻译最多显示", L"「翻译」类别在面板中最多列出的条数（0–9，0 表示不限制）",
                          dim(BindStepper(context, "general.candidate_expansion_panel_translation_max_count", 0, 9))),
