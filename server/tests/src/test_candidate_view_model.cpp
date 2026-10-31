@@ -43,7 +43,7 @@ TEST_CASE(candidate_view_pos_toggle_updates_display_and_refresh_signature)
     item.translation = FanyImeIpc::FormatTranslationGlossForDisplay(raw, true);
     const auto shown_html = CandidateViewHtml(item);
     const auto shown_signature = CandidatePageSignature({item});
-    const CandidateFramePageState page{2, 1, true, true};
+    const CandidateFramePageState page{2, 1, true, true, false, 0, 0, std::wstring{}};
     const auto shown_frame = CandidateFrameSignature(L"xiao", {item}, 10, 20, page);
 
     item.translation = FanyImeIpc::FormatTranslationGlossForDisplay(raw, false);
@@ -75,7 +75,7 @@ TEST_CASE(candidate_frame_signature_includes_page_state)
     CandidateViewItem item;
     item.text = "candidate";
     const std::vector<CandidateViewItem> views{item};
-    const CandidateFramePageState page{0, 1, false, true};
+    const CandidateFramePageState page{0, 1, false, true, false, 0, 0, std::wstring{}};
     const std::wstring original = CandidateFrameSignature(L"preedit", views, 10, 20, page);
 
     REQUIRE_EQ(original, CandidateFrameSignature(L"preedit", views, 10, 20, page));
@@ -95,7 +95,7 @@ TEST_CASE(candidate_frame_signature_includes_expansion_panel_state)
     CandidateViewItem item;
     item.text = "candidate";
     const std::vector<CandidateViewItem> views{item};
-    const CandidateFramePageState page{0, 1, false, true};
+    const CandidateFramePageState page{0, 1, false, true, false, 0, 0, std::wstring{}};
     const std::wstring original = CandidateFrameSignature(L"preedit", views, 10, 20, page);
 
     // 面板内 ↑↓ 只改 expansion_panel_selected：必须改变签名，否则快速移动会被 250ms 去抖吞掉，
@@ -154,7 +154,7 @@ TEST_CASE(candidate_frame_signature_keeps_preedit_selection_and_caret)
     first.text = "first";
     second.text = "second";
     const std::vector<CandidateViewItem> views{first, second};
-    const CandidateFramePageState page{0, 1, false, true};
+    const CandidateFramePageState page{0, 1, false, true, false, 0, 0, std::wstring{}};
     const std::wstring original = CandidateFrameSignature(L"preedit", views, 10, 20, page);
 
     CandidateFramePageState changed = page;
@@ -173,7 +173,7 @@ TEST_CASE(candidate_frame_signature_keeps_length_prefixed_candidate_identity)
     a.text = "a";
     bc.text = "b,c";
 
-    const CandidateFramePageState page{0, 0, false, true};
+    const CandidateFramePageState page{0, 0, false, true, false, 0, 0, std::wstring{}};
     REQUIRE(CandidateFrameSignature(L"", {ab, c}, 10, 20, page) != CandidateFrameSignature(L"", {a, bc}, 10, 20, page));
 }
 
