@@ -730,6 +730,9 @@ class CandidateList : public Visual
         D2D1_COLOR_F translationDelimiterColor = D2D1::ColorF(0, 0.0f);
         D2D1_COLOR_F rowTranslationSecondarySelected = D2D1::ColorF(0, 0.0f);
         D2D1_COLOR_F rowTranslationDelimiterSelected = D2D1::ColorF(0, 0.0f);
+        // Translation font size as a fraction of fontSize. 0.78 matches the CSS
+        // .cand-translation scale; hosts like the expansion panel raise it a bit.
+        float translationFontSizeScale = 0.78f;
     };
 
     using SelectionChangedHandler = std::function<void(size_t selectedIndex)>;

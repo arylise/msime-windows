@@ -480,11 +480,13 @@ inline CandidateUiState candidate_ui;
 
 // 展开面板的一条目：display 是面板显示文字，tag 是类别淡色前缀（译/表情/颜），commit 是上屏
 // 文本。presenter 只用 display+tag 渲染；上屏走服务端按键路径，按 index 重新跑提供方管线取 commit。
+// category_id 只用来让 presenter 区分翻译条目（走与主列表一致的译文着色路径），不参与签名与上屏。
 struct CandidateExpansionPanelItem
 {
     std::wstring display;
     std::wstring tag;
     std::wstring commit;
+    std::wstring category_id;
 };
 
 // candidate_ui belongs to the IPC worker thread, which rebuilds and destroys its vectors while the UI thread paints;

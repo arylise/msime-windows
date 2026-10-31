@@ -530,8 +530,9 @@ void PublishBuiltCandidatePage(const std::wstring &candidate_string)
                 std::clamp(mutable_ui.expansion_panel_selected, 0, static_cast<int>(items.size()) - 1);
             for (const auto &item : items)
             {
-                snapshot->expansion_panel_items.push_back(
-                    {string_to_wstring(item.display), string_to_wstring(item.tag), string_to_wstring(item.commit)});
+                snapshot->expansion_panel_items.push_back({string_to_wstring(item.display), string_to_wstring(item.tag),
+                                                           string_to_wstring(item.commit),
+                                                           string_to_wstring(item.category_id)});
             }
         }
     }
