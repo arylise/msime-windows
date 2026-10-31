@@ -15,6 +15,7 @@
 #include "defines/globals.h"
 #include "utils/common_utils.h"
 #include "utils/serial_task_runner.h"
+#include "utils/thread_priority.h"
 #include <utf8.h>
 #include "global/globals.h"
 #include "engine/user_dictionary/user_dictionary_journal.h"
@@ -22,6 +23,8 @@
 #include "window/caret_state_indicator_policy.h"
 #include "english/english_ime.h"
 #include "config/ime_config.h"
+#include "conversion/chinese_converter.h"
+#include "ipc/traditional_variant_expansion_policy.h"
 #include "window/window_hook.h"
 #include "session/input_cadence.h"
 #include "session/session_factory.h"
@@ -382,6 +385,11 @@ void WorkerThread()
             ApplyUiLessFromPacket(namedpipeData);
         }
 
+        const TaskClass task_class = ClassifyTask(task.type);
+        // Microsoft's scheduling guidance: the thread that processes user input
+        // should run at Above normal. Only boost Foreground tasks; UserAction /
+        // Enrichment / Maintenance keep the process's Normal class.
+        ThreadPriority::ScopedBoost foreground_boost(THREAD_PRIORITY_ABOVE_NORMAL, NeedsInputPriorityBoost(task_class));
         switch (task.type)
         {
         case TaskType::ShowCandidate: {
@@ -466,8 +474,8 @@ void WorkerThread()
                 // 只记类别、请求标识和等待时长：按键内容、候选和文本一律不进诊断日志。
                 DIAG_LOGF(L"[key-latency] side=server stage=queue class={} request={} client={} epoch={} "
                           L"elapsed_ms={:.3f}",
-                          TaskClassName(ClassifyTask(task.type)), task.pipe_data.request_id, task.client_id,
-                          task.activation_epoch, queue_elapsed_ms);
+                          TaskClassName(task_class), task.pipe_data.request_id, task.client_id, task.activation_epoch,
+                          queue_elapsed_ms);
             }
             // 顶字后第 4 码丢失的定位探针：DLL 侧 keydown-sent 已确认发出，若这里没打出来，
             // 说明任务根本没进队列（reader 未收到/未入队）；打出来了但组合没变，才是 HandleImeKey 内部问题。
@@ -640,7 +648,14 @@ void WorkerThread()
         }
 
         case TaskType::StatusSnapshot: {
-            ReloadImeConfigIfChanged();
+            // 设置页改字形只写配置文件，server 在这里重读它；切到繁体时在后台预载转换字典。组字途中改了字形，
+            // 当前候选按新字形换写法。
+            if (ReloadImeConfigIfChanged())
+            {
+                if (GetConfiguredCharacterSet() == "traditional")
+                    ChineseConverter::PreloadInBackground();
+                RespellCandidatesForCharacterSetChange();
+            }
             const int cn_state = task.pipe_data.keycode != 0 ? 1 : 0;
             const int fullwidth_state = task.pipe_data.modifiers_down != 0 ? 1 : 0;
             const int punctuation_state = task.pipe_data.pinyin_length != 0 ? 1 : 0;
@@ -830,7 +845,8 @@ void WorkerThread()
                 else
                     (void)user_dictionary::adjust_candidate_ranking(
                         CommonUtils::get_ime_data_path() + "\\msime.db", user_dictionary::default_user_db_path(),
-                        context_key, Global::candidate_ui.items, entry_key, item.word, "pin", 1, 1, true, nullptr,
+                        context_key, FanyImeIpc::FirstVariantsOnly(Global::candidate_ui.items), entry_key, item.word,
+                        "pin", 1, 1, true, nullptr,
                         item.scheme == SchemeType::Wubi ? user_dictionary::DictionaryKind::Wubi
                                                         : user_dictionary::DictionaryKind::Pinyin);
             }
@@ -958,22 +974,29 @@ void WorkerThread()
         }
 
         case TaskType::ApplyCandidatePageSize: {
+            // 界面线程重读到配置变化后发来这个任务；字形也可能一起变了，那样就按新字形换写法。
             const int pageSize = GetConfiguredCandidatePageSize();
-            if (Global::candidate_ui.page_size != pageSize)
+            const bool page_size_changed = Global::candidate_ui.page_size != pageSize;
+            if (page_size_changed)
             {
                 Global::candidate_ui.page_size = pageSize;
                 Global::candidate_ui.page_index = 0;
                 Global::candidate_ui.clear_page();
-                const FanyImeIpc::CandidateUiOwner owner = SnapshotCandidateUiOwner();
-                if (owner && IsPipeActivationCurrent(owner.client_id, owner.activation_epoch))
-                {
-                    RefreshCandidatePageUi(true);
-                }
+            }
+            if (RespellCandidatesForCharacterSetChange() || !page_size_changed)
+                break;
+            const FanyImeIpc::CandidateUiOwner owner = SnapshotCandidateUiOwner();
+            if (owner && IsPipeActivationCurrent(owner.client_id, owner.activation_epoch))
+            {
+                RefreshCandidatePageUi(true);
             }
             break;
         }
 
         case TaskType::RefreshCandidatePage: {
+            // 悬浮工具栏切换字形后发来这个任务：组字途中换了字形就按新字形换写法。
+            if (RespellCandidatesForCharacterSetChange())
+                break;
             if (!Global::candidate_ui.items.empty())
             {
                 Global::candidate_ui.clear_page();
@@ -1239,7 +1262,8 @@ void EnqueueAdjustCandidateRankingTask(bool english, bool wubi, const std::strin
     }
     const auto &frequency = GetConfiguredFrequencyAdjustment();
     DictionaryWriter().Post([english, wubi, context_key,
-                             candidates = ranking_candidates ? *ranking_candidates : Global::candidate_ui.items,
+                             candidates = FanyImeIpc::FirstVariantsOnly(
+                                 ranking_candidates ? *ranking_candidates : Global::candidate_ui.items),
                              entry_key, word, mode = frequency.mode, linear_step = frequency.linear_step,
                              trigger_count = frequency.trigger_count] {
         if (english)

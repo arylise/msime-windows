@@ -3,6 +3,7 @@
 #include "window/ime_windows_internal.h"
 #include "global/globals.h"
 #include "config/ime_config.h"
+#include "conversion/chinese_converter.h"
 #include "ipc/ipc.h"
 #include "ime_windows.h"
 #include "window/candidate_presenter.h"
@@ -627,6 +628,7 @@ LRESULT CALLBACK WndProcCandWindow(HWND hwnd, UINT message, WPARAM wParam, LPARA
             const std::wstring previous_mid_sentence_helpcode_semicolon =
                 FormatMidSentenceHelpcodeSemicolonWorkerPayload();
             const std::wstring previous_direct_helpcode = FormatDirectHelpcodeWorkerPayload();
+            const std::wstring previous_direct_helpcode_end_trigger = FormatDirectHelpcodeEndTriggerWorkerPayload();
             const std::wstring previous_v_mode = FormatVModeWorkerPayload();
             const std::wstring previous_mid_sentence_helpcode_uppercase =
                 FormatMidSentenceHelpcodeUppercaseWorkerPayload();
@@ -646,6 +648,10 @@ LRESULT CALLBACK WndProcCandWindow(HWND hwnd, UINT message, WPARAM wParam, LPARA
             const VoiceInputConfig previous_voice_input = GetConfiguredVoiceInput();
             if (ReloadImeConfigIfChanged())
             {
+                // 下面入队的任务会按新字形换写法，切到繁体时先在后台载入转换字典。
+                if (previous_character_set != GetConfiguredCharacterSet() &&
+                    GetConfiguredCharacterSet() == "traditional")
+                    ChineseConverter::PreloadInBackground();
                 FanyNamedPipe::EnqueueApplyCandidatePageSizeTask();
                 // ApplyConfiguredInputScheme broadcasts the policy with the rest of the mode state.
                 if (previous_input_scheme != GetConfiguredActiveInputScheme())
@@ -831,6 +837,12 @@ LRESULT CALLBACK WndProcCandWindow(HWND hwnd, UINT message, WPARAM wParam, LPARA
                     BroadcastToTsfWorkerThreadViaNamedpipe(
                         Global::DataFromServerMsgTypeToTsfWorkerThread::DirectHelpcodeChanged,
                         FormatDirectHelpcodeWorkerPayload());
+                }
+                if (previous_direct_helpcode_end_trigger != FormatDirectHelpcodeEndTriggerWorkerPayload())
+                {
+                    BroadcastToTsfWorkerThreadViaNamedpipe(
+                        Global::DataFromServerMsgTypeToTsfWorkerThread::DirectHelpcodeEndTriggerChanged,
+                        FormatDirectHelpcodeEndTriggerWorkerPayload());
                 }
                 if (previous_v_mode != FormatVModeWorkerPayload())
                 {

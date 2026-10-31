@@ -136,8 +136,9 @@ KeyResult InputSession::handle_character(char character, bool shift_only)
         local_candidates_.clear();
         return {true, std::nullopt, std::nullopt};
     }
+    // 超级简拼只保留给双拼：全拼直接打声母就是简拼，Shift+J 留作普通大写 J。
     if (shift_only && character == 'J' && local_mode_options_.super_jianpin && !has_composition() &&
-        (scheme() == SchemeType::Quanpin || scheme() == SchemeType::Shuangpin))
+        scheme() == SchemeType::Shuangpin)
     {
         local_input_mode_ = LocalInputMode::SuperJianpin;
         local_preedit_ = "J";
@@ -448,6 +449,28 @@ void InputSession::set_direct_helpcode_markers(bool slash, bool uppercase)
     engine_.set_direct_helpcode_markers(slash, uppercase);
     update_mixed_candidates();
     online_requests_.invalidate();
+}
+
+void InputSession::set_direct_helpcode_end_trigger_enabled(bool enabled)
+{
+    if (direct_helpcode_end_trigger_enabled_ == enabled)
+    {
+        return;
+    }
+    direct_helpcode_end_trigger_enabled_ = enabled;
+    engine_.set_direct_helpcode_end_trigger_enabled(enabled);
+    update_mixed_candidates();
+    online_requests_.invalidate();
+}
+
+std::optional<std::string> InputSession::direct_helpcode_end_trigger_prefix(const std::string &typed)
+{
+    if (!direct_helpcode_enabled_ || !direct_helpcode_end_trigger_enabled_ || !is_shuangpin() ||
+        dedicated_english_mode_ || local_input_mode_ != LocalInputMode::None)
+    {
+        return std::nullopt;
+    }
+    return engine_.direct_helpcode_end_trigger_prefix(typed);
 }
 
 bool InputSession::accepts_direct_helpcode_slash_at(std::size_t caret) const

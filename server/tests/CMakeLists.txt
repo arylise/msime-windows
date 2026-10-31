@@ -52,6 +52,27 @@ target_include_directories(test_voice_target PRIVATE ../src)
 target_compile_features(test_voice_target PRIVATE cxx_std_17)
 add_test(NAME voice_target COMMAND test_voice_target)
 
+# Drives the real process-priority restore against a deliberately lowered
+# process, so the Server startup path is covered without launching the Server.
+add_executable(test_process_priority
+    src/test_process_priority.cpp
+    ../src/utils/process_priority.cpp)
+target_include_directories(test_process_priority PRIVATE ../src)
+target_compile_features(test_process_priority PRIVATE cxx_std_17)
+add_test(NAME process_priority COMMAND test_process_priority)
+set_tests_properties(process_priority PROPERTIES SKIP_RETURN_CODE 77)
+
+# Exercises the scoped thread-priority boost against the real thread APIs: the
+# guard must raise the thread, restore the entry priority, and skip cleanly on
+# hosts whose policy rejects thread priority changes.
+add_executable(test_thread_priority
+    src/test_thread_priority.cpp
+    ../src/utils/thread_priority.cpp)
+target_include_directories(test_thread_priority PRIVATE ../src)
+target_compile_features(test_thread_priority PRIVATE cxx_std_17)
+add_test(NAME thread_priority COMMAND test_thread_priority)
+set_tests_properties(thread_priority PROPERTIES SKIP_RETURN_CODE 77)
+
 set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/benchmark_model_path.cpp"
@@ -61,6 +82,8 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_kaomoji_query.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_symbol_query.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_jianpin_query.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_quanpin_jianpin_recall.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_fault_slot_jianpin.cpp"
     "${CMAKE_SOURCE_DIR}/src/clipboard/clipboard_history.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_kaomoji_sql.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_shuangpin_scheme.cpp"
@@ -123,6 +146,9 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_wheel_paging.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_view_model.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_text_policy.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_traditional_region_policy.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_traditional_variant_order_policy.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_traditional_variant_expansion_policy.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_settings_performance.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_size_estimator.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/candidate_size_estimator.cpp"
@@ -327,6 +353,21 @@ target_link_libraries(test_webview_contract PRIVATE Boost::json)
 add_test(NAME webview_contract COMMAND test_webview_contract
     "${MSIME_ENGINE_DIR}/contracts/webview/fixtures.json")
 
+
+# 繁体写法的转换结果来自真实的 OpenCC 字典：链接产品的 chinese_converter.cpp 与 traditional_spelling_index.cpp，
+# 转换器从 exe 所在目录的 assets/opencc 读字典。这个目录由 server 的 POST_BUILD 拷出，测试程序与 server
+# 输出到同一个 bin 目录，所以先构建 server。拷贝清单漏了字典时，只有干净构建会让它失败：增量构建里
+# copy_if_different 不删除已有的旧文件。
+add_executable(test_traditional_conversion
+    portable/main.cpp
+    src/test_traditional_conversion.cpp
+    ../src/conversion/chinese_converter.cpp
+    ../src/conversion/traditional_spelling_index.cpp)
+target_include_directories(test_traditional_conversion PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/src")
+target_compile_definitions(test_traditional_conversion PRIVATE NOMINMAX=1)
+target_link_libraries(test_traditional_conversion PRIVATE OpenCC::OpenCC)
+add_dependencies(test_traditional_conversion MetasequoiaImeServer)
+add_test(NAME traditional_conversion COMMAND test_traditional_conversion)
 
 add_executable(test_voice_result_card src/test_voice_result_card.cpp)
 target_include_directories(test_voice_result_card PRIVATE ../src)

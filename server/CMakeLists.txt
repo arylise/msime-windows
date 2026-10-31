@@ -243,6 +243,10 @@ set(SRC_FILES
     "./src/config/ime_config_write.cpp"
     "./src/conversion/chinese_converter.cpp"
     "./src/conversion/chinese_converter.h"
+    "./src/conversion/opencc_character_tables.h"
+    "./src/conversion/traditional_forms.h"
+    "./src/conversion/traditional_spelling_index.cpp"
+    "./src/conversion/traditional_spelling_index.h"
     "./src/defines/defines.h"
     "./src/english/english_ime.cpp"
     "./src/english/english_ime.h"
@@ -320,10 +324,14 @@ set(SRC_FILES
     "./src/utils/ime_utils.h"
     "./src/utils/network_proxy.cpp"
     "./src/utils/network_proxy.h"
+    "./src/utils/process_priority.cpp"
+    "./src/utils/process_priority.h"
     "./src/utils/serial_task_runner.cpp"
     "./src/utils/serial_task_runner.h"
     "./src/utils/shuangpin_preedit_display.cpp"
     "./src/utils/shuangpin_preedit_display.h"
+    "./src/utils/thread_priority.cpp"
+    "./src/utils/thread_priority.h"
     "./src/utils/window_utils.cpp"
     "./src/utils/window_utils.h"
     "./src/window/candidate_presenter.cpp"
@@ -713,6 +721,26 @@ add_custom_command(TARGET ${SETTINGS_EXECUTABLE_NAME} POST_BUILD
         "$<TARGET_FILE_DIR:${SETTINGS_EXECUTABLE_NAME}>/dict"
 )
 
+# OpenCC 配置与它们引用的字典：s2t 做标准繁体转换，t2tw、t2hk 在 s2t 结果上取台湾、香港写法，
+# t2s 把繁体转回简体，STCharacters 同时给单字的全部写法。tests/ 的真数据测试读这里拷出的目录。
+set(MSIME_OPENCC_RUNTIME_FILES
+    ${MSIME_VENDOR_DIR}/opencc/data/config/s2t.json
+    ${MSIME_VENDOR_DIR}/opencc/data/config/t2tw.json
+    ${MSIME_VENDOR_DIR}/opencc/data/config/t2hk.json
+    ${CMAKE_BINARY_DIR}/opencc/data/CJK_Compatibility_Ideographs.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/STCharacters.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/STPhrases.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/STPhrases_GeneratedFromRegionalPhrases.ocd2
+    ${MSIME_VENDOR_DIR}/opencc/data/config/t2s.json
+    ${CMAKE_BINARY_DIR}/opencc/data/TSCharacters.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/TSCharactersExt.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/TSPhrases.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/TWVariants.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/TWVariantsPhrases.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/HKVariants.ocd2
+    ${CMAKE_BINARY_DIR}/opencc/data/HKVariantsPhrases.ocd2
+)
+
 # Runtime assets next to the executable
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -724,15 +752,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets/opencc
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${MSIME_VENDOR_DIR}/opencc/data/config/s2t.json
-        ${CMAKE_BINARY_DIR}/opencc/data/CJK_Compatibility_Ideographs.ocd2
-        ${CMAKE_BINARY_DIR}/opencc/data/STCharacters.ocd2
-        ${CMAKE_BINARY_DIR}/opencc/data/STPhrases.ocd2
-        ${CMAKE_BINARY_DIR}/opencc/data/STPhrases_GeneratedFromRegionalPhrases.ocd2
-        ${MSIME_VENDOR_DIR}/opencc/data/config/t2s.json
-        ${CMAKE_BINARY_DIR}/opencc/data/TSCharacters.ocd2
-        ${CMAKE_BINARY_DIR}/opencc/data/TSCharactersExt.ocd2
-        ${CMAKE_BINARY_DIR}/opencc/data/TSPhrases.ocd2
+        ${MSIME_OPENCC_RUNTIME_FILES}
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets/opencc
 )
 
