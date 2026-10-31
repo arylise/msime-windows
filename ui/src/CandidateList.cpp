@@ -358,7 +358,7 @@ CandidateList::ItemGeometry CandidateList::MeasureItem(size_t index, float width
     geometry.tag = {tagX, 0.0f, tagW, appearance_.itemHeight};
     geometry.text = {textX, 0.0f, textW, textH};
     float height = textH;
-    float lineEnd = textW;
+    float lineEnd = item.text.empty() ? 0.0f : textW;
     // height 末尾属于行底内边距的部分：只有单行高度（itemHeight）里才含这段内边距，
     // 换到下方的辅助码和翻译从它上面开始排，排完再把它补回最后一行下面。
     const float padBottom = std::clamp(appearance_.contentPadBottom, 0.0f, appearance_.itemHeight * 0.5f);
@@ -383,8 +383,8 @@ CandidateList::ItemGeometry CandidateList::MeasureItem(size_t index, float width
     }
     if (!item.translation.empty())
     {
-        const float fontSize = appearance_.fontSize * 0.78f;
-        const float gap = appearance_.fontSize * 0.65f;
+        const float fontSize = appearance_.fontSize * appearance_.translationFontSizeScale;
+        const float gap = item.text.empty() ? 0.0f : appearance_.fontSize * 0.65f;
         const float naturalTranslationWidth = EstimateTextWidth(item.translation, fontSize);
         const float translationW = std::min(naturalTranslationWidth, contentWidth);
         const bool inlineTranslation = orientation_ == Orientation::Vertical && geometry.annotation.y == 0.0f &&
@@ -474,7 +474,8 @@ SizeF CandidateList::Measure(const SizeF &availableSize)
             const auto &item = items_[i];
             const float textWidth = EstimateTextWidth(item.text, appearance_.fontSize) +
                                     EstimateTextWidth(item.annotation, appearance_.annotationFontSize);
-            const float translationWidth = EstimateTextWidth(item.translation, appearance_.fontSize * 0.78f);
+            const float translationWidth =
+                EstimateTextWidth(item.translation, appearance_.fontSize * appearance_.translationFontSizeScale);
             const float contentWidth =
                 textWidth + (item.translation.empty() ? 0.0f : appearance_.fontSize * 0.65f + translationWidth);
             const float width =
@@ -584,7 +585,8 @@ SizeF CandidateList::Measure(const SizeF &availableSize)
         const float textSlack = !appearance_.fitContent ? 6.0f : (item.annotation.empty() ? 0.0f : 4.0f);
         const float textWidth = EstimateTextWidth(item.text, appearance_.fontSize) + textSlack +
                                 EstimateTextWidth(item.annotation, appearance_.annotationFontSize);
-        const float translationWidth = EstimateTextWidth(item.translation, appearance_.fontSize * 0.78f);
+        const float translationWidth =
+            EstimateTextWidth(item.translation, appearance_.fontSize * appearance_.translationFontSizeScale);
         const float contentWidth =
             horizontal
                 ? std::max(textWidth, translationWidth)
@@ -714,7 +716,7 @@ void CandidateList::Render(DeviceResources &deviceResources)
             }
         }
 
-        const float translationFontSize = appearance_.fontSize * 0.78f;
+        const float translationFontSize = appearance_.fontSize * appearance_.translationFontSizeScale;
         const auto &geometry = itemGeometry_[index];
         const auto absolute = [&](RectF rect) {
             rect.x += itemRect.x;

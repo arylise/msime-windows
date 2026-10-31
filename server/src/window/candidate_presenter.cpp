@@ -5,6 +5,7 @@
 #include "defines/globals.h"
 #include "global/globals.h"
 #include "ipc/candidate_translation_policy.h"
+#include "ipc/candidate_expansion_panel_policy.h"
 #include "ipc/event_listener.h"
 #include "ipc/ipc.h"
 #include "log/candidate_diag_log.h"
@@ -889,6 +890,9 @@ bool CandidatePresenter::PrepareExpansionPanel(float &needWidthDip, float &needH
     appearance.gridColumns = 0;
     appearance.justifyHorizontalRows = false;
     appearance.minItemWidth = 0.0f;
+    // 面板里的译义走与主列表行内译文完全相同的着色通道（主题色，随皮肤切换），只把字号从行内的
+    // 0.78 比例稍微放大；行高仍由 itemHeight 决定，不随字号变。
+    appearance.translationFontSizeScale = 0.9f;
     list->SetAppearance(std::move(appearance));
     std::vector<msimeui::CandidateList::Item> items;
     items.reserve(page.expansion_panel_items.size());
@@ -900,7 +904,28 @@ bool CandidatePresenter::PrepareExpansionPanel(float &needWidthDip, float &needH
         msimeui::CandidateList::Item item;
         item.label = std::to_wstring(row_index + 1);
         item.tag = entry.tag;
-        item.text = entry.display;
+        if (entry.category_id == string_to_wstring(std::string(FanyImeIpc::kCategoryTranslation)))
+        {
+            // 翻译条目：与主列表 FillItemsFromUi 同一条路径——正文进 translation 通道（译文色），
+            // 词性与分隔符按 Secondary/Delimiter run 走各自的皮肤配色；没配时继承译文色。
+            for (const auto &segment : FanyImeIpc::SegmentTranslationGloss(wstring_to_string(entry.display)))
+            {
+                const std::wstring text = string_to_wstring(segment.text);
+                if (segment.kind != FanyImeIpc::TranslationSegmentKind::Text)
+                {
+                    item.translationRuns.push_back({static_cast<UINT32>(item.translation.size()),
+                                                    static_cast<UINT32>(text.size()),
+                                                    segment.kind == FanyImeIpc::TranslationSegmentKind::Separator
+                                                        ? msimeui::CandidateList::TextRunRole::Delimiter
+                                                        : msimeui::CandidateList::TextRunRole::Secondary});
+                }
+                item.translation += text;
+            }
+        }
+        else
+        {
+            item.text = entry.display;
+        }
         items.push_back(std::move(item));
         ++row_index;
     }
