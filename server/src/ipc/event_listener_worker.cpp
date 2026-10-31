@@ -265,7 +265,8 @@ void WorkerThread()
             task.type == TaskType::UiDeleteCandidate || task.type == TaskType::UiFixCandidatePosition ||
             task.type == TaskType::UiClearCandidatePosition || task.type == TaskType::UiPageUp ||
             task.type == TaskType::UiPageDown || task.type == TaskType::UiCommitCandidateAt ||
-            task.type == TaskType::UiExpandCandidates || task.type == TaskType::UiCloseTranslationPanel;
+            task.type == TaskType::UiExpandCandidates || task.type == TaskType::UiCloseTranslationPanel ||
+            task.type == TaskType::UiCommitExpansionPanelItem;
         if (candidateUiAction && !CandidateUiOwnerIsCurrent({task.client_id, task.activation_epoch}))
         {
             // The page was hidden or replaced after the click was posted.
@@ -648,6 +649,22 @@ void WorkerThread()
                 SendToTsfWorkerThreadClientViaNamedpipe(task.client_id, task.activation_epoch,
                                                         Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidate,
                                                         L"");
+            }
+            break;
+        }
+
+        case TaskType::UiCommitExpansionPanelItem: {
+            // 面板点选与数字键同一条上屏内核；面板已不在或下标越界时什么都不投递，
+            // 与「点击落空」一致。成功时内核已置好 selected_text。
+            if (!CommitCandidateExpansionPanelSenseText(task.candidate_one_based_index - 1, 0))
+            {
+                break;
+            }
+            if (SendToTsfWorkerThreadClientViaNamedpipe(task.client_id, task.activation_epoch,
+                                                        Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidate,
+                                                        Global::candidate_ui.selected_text))
+            {
+                ClearState();
             }
             break;
         }
@@ -1302,6 +1319,29 @@ void EnqueueCandidateUiCommitAt(int absolute_index, std::wstring expected_text)
         task.candidate_absolute_index = absolute_index;
         task.candidate_expected_text = std::move(expected_text);
         taskQueue.push(std::move(task));
+    }
+    pipe_queueCv.notify_one();
+}
+
+void EnqueueCandidateUiCommitExpansionPanel(int panel_index)
+{
+    if (!pipe_running || panel_index < 0)
+    {
+        return;
+    }
+    const FanyImeIpc::CandidateUiOwner owner = SnapshotCandidateUiOwner();
+    if (!owner)
+    {
+        return;
+    }
+    {
+        std::lock_guard lock(queueMutex);
+        Task task;
+        task.type = TaskType::UiCommitExpansionPanelItem;
+        task.client_id = owner.client_id;
+        task.activation_epoch = owner.activation_epoch;
+        task.candidate_one_based_index = panel_index + 1;
+        PushTaskLocked(std::move(task));
     }
     pipe_queueCv.notify_one();
 }

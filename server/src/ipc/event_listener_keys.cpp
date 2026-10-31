@@ -924,6 +924,7 @@ void CloseCandidateExpansionPanel()
     ui.expansion_panel_query_anchor.clear();
     ui.expansion_panel_cached_emoji.clear();
     ui.expansion_panel_cached_kaomoji.clear();
+    ui.expansion_panel_cached_symbols.clear();
 }
 
 // ↑↓ 在面板内循环移动高亮项。越界折回另一端，和主列表的选词方向一致。
@@ -966,10 +967,10 @@ int CandidateExpansionPanelMoveOffset(UINT keycode, UINT modifiers)
 
 // 空格/数字 1..9：上屏面板里高亮或对应序号的那条。与 Ctrl+Enter 单条译义上屏走同一条 CommitExactText 路径。
 // 回车不在这里：面板开着时回车先关面板再照常处理，最终上屏原始输入串（见下面的按键分发注释）。
-void CommitCandidateExpansionPanelSense(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id,
-                                        int forced_index = -1)
+// 内核与候选窗鼠标点选共用（见 event_listener_internal.h 的声明）：这里只补按键路径的投递。
+bool CommitCandidateExpansionPanelSenseText(int forced_index, UINT render_sync_keycode)
 {
-    WaitForCandidateRenderSync(Global::Keycode);
+    WaitForCandidateRenderSync(render_sync_keycode);
     EnsureCandidatePageReady();
     auto &ui = Global::candidate_ui;
     const auto items = CurrentExpansionPanelItems();
@@ -977,13 +978,26 @@ void CommitCandidateExpansionPanelSense(uint64_t client_id, uint64_t activation_
     CloseCandidateExpansionPanel();
     if (items.empty())
     {
-        Global::MsgTypeToTsf = Global::DataFromServerMsgType::NavigationIgnored;
-        SendCurrentDataToClient(client_id, activation_epoch, request_id);
-        return;
+        return false;
+    }
+    // 点击下标越界：面板内容在点击之后已经换过（如高亮切了词），按空操作处理，不上屏错条目。
+    if (forced_index >= 0 && forced_index >= static_cast<int>(items.size()))
+    {
+        return false;
     }
     const auto &item = items[std::clamp(selected, 0, static_cast<int>(items.size()) - 1)];
     Global::MsgTypeToTsf = Global::DataFromServerMsgType::CommitExactText;
     ui.selected_text = string_to_wstring(CandidateTextForOutput(item.commit));
+    return true;
+}
+
+void CommitCandidateExpansionPanelSense(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id,
+                                        int forced_index = -1)
+{
+    if (!CommitCandidateExpansionPanelSenseText(forced_index, Global::Keycode))
+    {
+        Global::MsgTypeToTsf = Global::DataFromServerMsgType::NavigationIgnored;
+    }
     SendCurrentDataToClient(client_id, activation_epoch, request_id);
 }
 
@@ -1015,8 +1029,14 @@ void HandleCandidateExpansionKey(uint64_t client_id, uint64_t activation_epoch, 
     // 不再用 page_glosses 的边界判断「高亮项存在」——emoji-only 的候选没有译文、page_glosses 为空，
     // 但仍应能开面板。是否存在可展开内容，统一交给下面的 items.empty() 判断（它已对空 gloss / 空
     // anchor 做了处理）。
-    const auto items = CurrentExpansionPanelItems();
-    if (items.empty())
+    auto items = CurrentExpansionPanelItems();
+    // 惰性门控下译文可能根本没查过（行内关着、面板没开过），高亮词的 gloss 不在 page_glosses 里，
+    // 上面这份 items 会假空。译义类启用时补查一次：本地命中即种进缓存，下面那次
+    // RefreshCandidatePageUi 会重建 page_glosses，面板首开就有译义；云端可译则乐观打开，回填走
+    // 异步结果。探测也空才落到拒绝分支——这个词确实没有任何可展开内容。
+    const bool translation_probe_hit = items.empty() && GetConfiguredCandidateExpansionPanelTranslationEnabled() &&
+                                       ProbeTranslationForHighlightedCandidate();
+    if (items.empty() && !translation_probe_hit)
     {
         // 高亮的这条没有任何启用类别的条目（没有译文、也没有 emoji）：面板不开，这颗键也不做别的
         // （和按在空白处一样被吃掉）。
@@ -1400,7 +1420,8 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
 
     // 候选展开面板：移动键（默认裸 ↑ / ↓，可在设置页录成别的键或清除）在面板内移动条目高亮，
     // 空格上屏对应条目；数字键（1..9，与中文候选窗数字选词同序）直接上屏对应序号的条目，越界只回一帧空操作；
-    // 回车上屏原始输入串（与面板未开时同路：服务端只回 NavigationIgnored，TSF 本地按原始输入上屏）；
+    // 回车不进服务端：TSF 本地按原始输入上屏（与面板未开时同路），候选窗 teardown 随之发来
+    // HideCandidateWnd，面板按「候选窗收起」那条规则一起关掉；
     // 左右键始终移动中文候选高亮（面板跟随新高亮重新派生条目，哪怕光标不在组合串尾也不移光标），翻页键
     // 同样让面板跟随；未被录成移动键的 ↑↓ 会照常移动候选高亮（竖排候选窗靠它们切词），面板同样跟随；
     // 其它任何键先把面板关掉，再照常处理这颗键，所以退格、字母、标点在面板打开时的表现
@@ -1422,8 +1443,9 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             CommitCandidateExpansionPanelSense(client_id, activation_epoch, request_id);
             return;
         }
-        // 回车不拦截：落到下面的「其它键」路径先关面板，再照常处理——普通回车上屏原始输入串，
-        // Shift+回车上屏原始/转换后的全拼，都与面板未开时完全一致。
+        // 这里不会有回车：候选态的回车由 TSF 分类成 FUNCTION_FINALIZE_CANDIDATELISTForVKReturn 并纯本地
+        // 上屏原始输入串，从不发到服务端；面板随候选窗 teardown 的 HideCandidateWnd 关掉，与面板未开时
+        // 完全一致。
         // 面板打开时按数字 1..9：直接上屏对应序号的条目。序号映射与中文候选窗的数字选词完全一致
         // （index = keycode - '1'；本输入法不用 0，也不走需要 Ctrl 的 TranslationDigitPosition）。越界只回
         // 一帧 OutofRange 空操作，面板保持打开，也不落到下面的普通数字选词。
@@ -2239,14 +2261,6 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
                 RefreshCandidatePageUi(true);
             }
         }
-    }
-    else if (Global::Keycode == VK_RETURN)
-    {
-        // 非面板、非 Shift+Enter 的普通回车：引擎已在上面的 forward-to-session 里消费了这颗键，
-        // TSF 仍按本地原始输入上屏。这里回一帧空操作，让 TSF 的异步提交回复路径不会空等超时；
-        // 面板打开时的回车在更上面已经用 CommitExactText 直接上屏高亮英文译义，不会走到这里。
-        Global::MsgTypeToTsf = Global::DataFromServerMsgType::NavigationIgnored;
-        SendCurrentDataToClient(client_id, activation_epoch, request_id);
     }
 }
 } // namespace FanyNamedPipe

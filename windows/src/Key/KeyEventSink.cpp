@@ -1481,13 +1481,14 @@ CMetasequoiaIME::KeyDownDispatchResult CMetasequoiaIME::_DispatchKeyDown(
         // longer than its budget would drop a commit the Server is about to
         // apply. Space and the two candidate-mode finalize functions all end in
         // _HandleCandidateFinalize. The VK_RETURN variant ends in
-        // _HandleCandidateFinalizeForVKReturn, which now also honours a committing
-        // Server reply (the translation panel commits the highlighted English sense
-        // with CommitExactText), so it goes through the same prefetch.
+        // _HandleCandidateFinalizeForVKReturn, which commits the raw composition
+        // locally and never waits for a Server reply, so it stays out of the
+        // prefetch: routing Enter through the pipe would add a round-trip to a
+        // key that needs nothing from the Server, and a hung Server would turn
+        // a plain Enter into a transport failure.
         const bool finalizeKey = KeystrokeState.Category == CATEGORY_CANDIDATE &&
                                  (KeystrokeState.Function == FUNCTION_FINALIZE_CANDIDATELIST ||
-                                  KeystrokeState.Function == FUNCTION_FINALIZE_CANDIDATELIST_AND_INPUT ||
-                                  KeystrokeState.Function == FUNCTION_FINALIZE_CANDIDATELISTForVKReturn);
+                                  KeystrokeState.Function == FUNCTION_FINALIZE_CANDIDATELIST_AND_INPUT);
         const bool convertKey = code == VK_SPACE && KeystrokeState.Function == FUNCTION_CONVERT;
         if ((finalizeKey || convertKey) && _msgWndHandle)
         {

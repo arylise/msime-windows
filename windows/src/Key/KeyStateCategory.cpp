@@ -402,7 +402,7 @@ HRESULT CKeyStateCandidate::HandleKeyFinalizeCandidatelist(KeyHandlerEditSession
 // _HandleCandidateInput
 HRESULT CKeyStateCandidate::HandleKeyFinalizeCandidatelistForVKReturn(KeyHandlerEditSessionDTO dto)
 {
-    return _pTextService->_HandleCandidateFinalizeForVKReturn(dto.ec, dto.pContext, dto.requestId, dto.prefetchedText);
+    return _pTextService->_HandleCandidateFinalizeForVKReturn(dto.ec, dto.pContext);
 }
 
 // HandleKeyFinalizeCandidatelistAndInput

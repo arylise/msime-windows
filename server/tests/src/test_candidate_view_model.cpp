@@ -102,7 +102,7 @@ TEST_CASE(candidate_frame_signature_includes_expansion_panel_state)
     // 面板高亮停在上一项而服务端真实选中已到下一项（空格上屏下一项）。
     CandidateFramePageState changed = page;
     changed.expansion_panel_active = true;
-    changed.expansion_panel_item_count = 3;
+    changed.expansion_panel_signature = L"1:a2:hi";
     const std::wstring with_panel = CandidateFrameSignature(L"preedit", views, 10, 20, changed);
     REQUIRE(original != with_panel);
 
@@ -114,13 +114,38 @@ TEST_CASE(candidate_frame_signature_includes_expansion_panel_state)
     changed = page;
     changed.expansion_panel_active = true;
     changed.expansion_panel_anchor = 1;
-    changed.expansion_panel_item_count = 3;
+    changed.expansion_panel_signature = L"1:a2:hi";
     REQUIRE(with_panel != CandidateFrameSignature(L"preedit", views, 10, 20, changed));
 
+    // 条数不变、文本变（译文第二波回填、词性显示切换）：必须改变签名，否则面板停在旧文本。
     changed = page;
     changed.expansion_panel_active = true;
-    changed.expansion_panel_item_count = 5;
+    changed.expansion_panel_signature = L"1:a2:yo";
     REQUIRE(with_panel != CandidateFrameSignature(L"preedit", views, 10, 20, changed));
+
+    // 条目数变（改「每类最多显示」）：文本签名自然不同。
+    changed = page;
+    changed.expansion_panel_active = true;
+    changed.expansion_panel_signature = L"1:a1:b2:hi";
+    REQUIRE(with_panel != CandidateFrameSignature(L"preedit", views, 10, 20, changed));
+}
+
+TEST_CASE(candidate_expansion_panel_signature_length_prefixes_fields)
+{
+    struct PanelItem
+    {
+        std::wstring tag;
+        std::wstring display;
+    };
+    const std::vector<PanelItem> ab_c{{L"", L"a,b"}, {L"", L"c"}};
+    const std::vector<PanelItem> a_bc{{L"", L"a"}, {L"", L"b,c"}};
+    REQUIRE(CandidateExpansionPanelSignature(ab_c) != CandidateExpansionPanelSignature(a_bc));
+    REQUIRE_EQ(CandidateExpansionPanelSignature(ab_c), CandidateExpansionPanelSignature(ab_c));
+
+    // tag 与 display 的边界也不能串位：tag="a2:b"+display="" 与 tag="a"+display="2:b" 必须不同。
+    const std::vector<PanelItem> boundary_a{{L"a2:b", L""}};
+    const std::vector<PanelItem> boundary_b{{L"a", L"2:b"}};
+    REQUIRE(CandidateExpansionPanelSignature(boundary_a) != CandidateExpansionPanelSignature(boundary_b));
 }
 
 TEST_CASE(candidate_frame_signature_keeps_preedit_selection_and_caret)

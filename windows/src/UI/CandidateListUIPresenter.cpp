@@ -139,70 +139,20 @@ HRESULT CMetasequoiaIME::_HandleCandidateFinalize(TfEditCookie ec, _In_ ITfConte
 //
 //----------------------------------------------------------------------------
 
-HRESULT CMetasequoiaIME::_HandleCandidateFinalizeForVKReturn(TfEditCookie ec, _In_ ITfContext *pContext,
-                                                             uint64_t requestId, const std::wstring &prefetchedText)
+HRESULT CMetasequoiaIME::_HandleCandidateFinalizeForVKReturn(TfEditCookie ec, _In_ ITfContext *pContext)
 {
-    (void)prefetchedText;
     HRESULT hr = S_OK;
     WCHAR committedLastChar = 0;
 
-    // 面板打开时只有空格走 CommitExactText（服务端把面板选中项作为本次请求的回复预取进缓存，
-    // 这里读出来直接上屏）。回车无论面板开否服务端都只回一帧 NavigationIgnored（引擎已消费
-    // 该键），落到下面的本地原始输入上屏，行为与改动前一致。
-    UINT serverMsgType = Global::DataFromServerMsgType::OutofRange;
-    std::wstring serverCandidateString;
-    const bool hasPrefetchedServerCandidate = _TakePendingServerCandidate(&serverMsgType, &serverCandidateString);
-    if (!hasPrefetchedServerCandidate)
-    {
-        struct FanyImeNamedpipeDataToTsf *receivedData = nullptr;
-        const CommitReplyWaitStatus replyStatus =
-            TryReadCommitReplyFromServerPipe(requestId, _SessionCommitReplyWaitMs(), &receivedData);
-        if (replyStatus == CommitReplyWaitStatus::NotReady)
-        {
-            // The transport is healthy and the reply is simply not here yet.
-            // Apply nothing; the edit session's completion hook hands this
-            // request back to the cooperative poll.
-            return FANY_S_COMMIT_REPLY_NOT_READY;
-        }
-        serverMsgType = receivedData->msg_type;
-        serverCandidateString = receivedData->candidate_string;
-    }
-
-    if (serverMsgType == Global::DataFromServerMsgType::TransportUnavailable)
-    {
-        return IsDeliveredServerRequestId(requestId) ? FANY_E_COMMIT_REPLY_AMBIGUOUS
-                                                     : HRESULT_FROM_WIN32(ERROR_BROKEN_PIPE);
-    }
-
-    if ((serverMsgType == Global::DataFromServerMsgType::Normal ||
-         serverMsgType == Global::DataFromServerMsgType::CommitExactText) &&
-        !serverCandidateString.empty())
-    {
-        GlobalIme::word_for_creating_word.clear();
-        GlobalIme::pending_create_word_preedit.clear();
-        CStringRange candidateString;
-        candidateString.Set(serverCandidateString.c_str(), serverCandidateString.length());
-        hr = _InsertTextToComposition(ec, pContext, &candidateString);
-        if (FAILED(hr))
-        {
-            hr = _AddComposingAndChar(ec, pContext, &candidateString);
-        }
-        if (FAILED(hr))
-        {
-            return hr;
-        }
-        committedLastChar = serverCandidateString[serverCandidateString.length() - 1];
-        _HandleComplete(ec, pContext);
-        if (committedLastChar != 0)
-        {
-            _smartPunctuationShadowChar = committedLastChar;
-            _smartPunctuationShadowValid = true;
-        }
-        return hr;
-    }
-
-    // 回退：普通回车按本地原始输入上屏；造词时连同已选前缀一起上屏。与改动前完全一致。
     CStringRange keyStrokebuffer = _pCompositionProcessorEngine->GetKeystrokeBuffer();
+
+    // While a word is being created the preedit is 已选汉字 + 剩余原始输入 (see
+    // _HandleCompositionInputWorker); the keystroke buffer only holds the
+    // remaining raw part. Enter commits what the preedit shows, so the
+    // already selected prefix has to be committed with it. Clearing here
+    // matches the Normal branch of _HandleCandidateFinalize and mirrors the
+    // Server, which drops its own creating_word state when the candidate
+    // presenter teardown below sends HideCandidateWnd.
     const std::wstring commitText = GlobalIme::word_for_creating_word + keyStrokebuffer.ToWString();
     GlobalIme::word_for_creating_word.clear();
     GlobalIme::pending_create_word_preedit.clear();
