@@ -1341,7 +1341,7 @@ void EnqueueCandidateUiCommitExpansionPanel(int panel_index)
         task.client_id = owner.client_id;
         task.activation_epoch = owner.activation_epoch;
         task.candidate_one_based_index = panel_index + 1;
-        PushTaskLocked(std::move(task));
+        taskQueue.push(std::move(task));
     }
     pipe_queueCv.notify_one();
 }
